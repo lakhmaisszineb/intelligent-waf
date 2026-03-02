@@ -31,3 +31,13 @@
 - Fichiers : __init__.py (vide), main.py (code proxy), proxy.py (vide), README.md, setup_log.md
 - Objectif : base du reverse proxy
 
+### Étape Git : Premier push sur GitHub
+- Date : 28 février 2026
+- Commandes :
+  git init
+  git add .gitignore && git commit -m "Ajout .gitignore"
+  git add . && git commit -m "Structure initiale projet"
+  git remote add origin https://github.com/lakhmaisszineb/intelligent-waf.git
+  git branch -M main
+  git push -u origin main
+- Résultat : Projet synchronisé sur GitHub 
