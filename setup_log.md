@@ -23,15 +23,15 @@
 
 ### Étape 6 : Génération de requirements.txt
 - Commande : `pip freeze > requirements.txt`
-- Explication : Sauvegarde la liste exacte des paquets installés (avec versions) pour partage. Contenu du fichier .
+- Explication : Sauvegarde la liste exacte des paquets installés (avec versions) pour partage. Contenu du fichier mis à jour régulièrement.
 
-### Étape suivante : Structure du projet
+### Étape 7 : Structure du projet (création dossiers et fichiers)
 - Date : 28 Février 2026
-- Créé dossiers : app/, logs/
-- Fichiers : __init__.py (vide), main.py (code proxy), proxy.py (vide), README.md, setup_log.md
+- Créé dossiers : app/
+- Fichiers : __init__.py (vide), main.py (code reverse proxy), proxy.py (vide), README.md, setup_log.md
 - Objectif : base du reverse proxy
 
-### Étape Git : Premier push sur GitHub
+### Étape 8 : Premier push sur GitHub
 - Date : 28 février 2026
 - Commandes :
   git init
@@ -40,4 +40,20 @@
   git remote add origin https://github.com/lakhmaisszineb/intelligent-waf.git
   git branch -M main
   git push -u origin main
-- Résultat : Projet synchronisé sur GitHub 
+- Résultat : Projet synchronisé sur GitHub (privé), branche main trackée.
+
+### Étape 9 : Reverse proxy basique fonctionnel (forwarding pur)
+- Date : 3 mars 2026
+- Modification : TARGET_URL configurable via .env ou dans le code
+- Test avec site distant : https://httpbin.org (public, fiable, sans installation)
+- Commande de lancement : uvicorn app.main:app --reload --port 8000
+- Résultat : 
+  - http://localhost:8000/anything → JSON de httpbin.org (preuve de forwarding correct)
+  - Logs Uvicorn montrent requêtes entrantes et réponses 200 OK
+- Objectif atteint : reverse proxy simple transmet les requêtes sans modification
+
+### Notes générales
+- Shell utilisé : fish (d’où activate.fish)
+- Serveur : Uvicorn sur port 8000 (développement)
+- Site cible test : httpbin.org (public) pour éviter installations complexes
+- Prochaines étapes : ajouter règles de détection (regex SQLi/XSS) + extraction dans rule_engine.py
