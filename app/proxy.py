@@ -13,15 +13,35 @@ async def forward_request(request: Request, target_url: str, path: str) -> Respo
         url += "?" + str(request.query_params)
 
     # Envoi avec httpx (asynchrone)
-    async with httpx.AsyncClient() as client:
-        response = await client.request(
-            method=request.method,
-            url=url,
-            headers=dict(request.headers),
-            content=await request.body(),
-            timeout=30.0
-        )
+    # modifit lcode hna pour la Gestion des erreurs backend
+    response = None
+    try:
 
+        # ------------------------------------------------------
+        # Forward de la requête vers le serveur cible
+        # httpx agit ici comme client HTTP
+        # ------------------------------------------------------
+        headers = dict(request.headers)
+        headers.pop("host", None)
+        async with httpx.AsyncClient() as client:
+            response = await client.request(
+                method=request.method,
+                url=url,
+                headers=headers,
+                content=await request.body(),
+                timeout=30.0
+            )
+
+    except httpx.RequestError:
+
+        # ------------------------------------------------------
+        # Gestion erreur : serveur backend inaccessible
+        # Exemple : serveur down ou timeout
+        # ------------------------------------------------------
+        return Response(
+            content="Backend server unavailable",
+            status_code=502
+        )
     # Renvoie la réponse telle quelle
     return Response(
         content=response.content,
