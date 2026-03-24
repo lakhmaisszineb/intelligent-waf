@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Request, Response
 from dotenv import load_dotenv
-import logging
 import os
 
-# Importe la fonction de forwarding depuis proxy.py
 from .proxy import forward_request
+from .logger import log_request
+
 from .rule_engine import check_request
 #hna zdt la partie dyal logs
 # ------------------------------------------------------
@@ -27,19 +27,12 @@ waf = FastAPI()
 
 @waf.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def proxy_request(path: str, request: Request):
-    # ------------------------------------------------------
-    # LOGGING: enregistrer les informations de la requête
-    # Ces logs serviront plus tard pour :
-    # - analyse sécurité
-    # - debugging
-    # - dataset pour Machine Learning
-    # ------------------------------------------------------
+    
     client_ip = request.client.host if request.client else "unknown"
     method = request.method
 
-    logger.info(
-        f"Incoming request | IP={client_ip} | METHOD={method} | PATH=/{path}"
-    )
+    # Log de la requête entrante
+    log_request(client_ip, method, path)
 
     # ── Inspection de la requête par le moteur de règles ──────────────────
     # result = await check_request(request)  # TEMP: désactivé pour debug
@@ -56,5 +49,5 @@ async def proxy_request(path: str, request: Request):
 
     # Forward de la requête vers le serveur cible
     response = await forward_request(request, TARGET_URL, path)
-
     return response
+
