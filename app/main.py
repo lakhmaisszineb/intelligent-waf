@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from dotenv import load_dotenv
 import logging
 import os
 
 # Importe la fonction de forwarding depuis proxy.py
 from .proxy import forward_request
+from .rule_engine import check_request
 #hna zdt la partie dyal logs
 # ------------------------------------------------------
 # Configuration du système de logging
@@ -39,6 +40,19 @@ async def proxy_request(path: str, request: Request):
     logger.info(
         f"Incoming request | IP={client_ip} | METHOD={method} | PATH=/{path}"
     )
+
+    # ── Inspection de la requête par le moteur de règles ──────────────────
+    # result = await check_request(request)  # TEMP: désactivé pour debug
+
+    # if result["blocked"]:
+    #     logger.warning(
+    #         f"BLOCKED | IP={client_ip} | TYPE={result['type']} "
+    #         f"| LOCATION={result['location']} | REASON={result['reason']}"
+    #     )
+    #     return Response(
+    #         content=f"403 Forbidden - {result['type']} detected",
+    #         status_code=403
+    #     )
 
     # Forward de la requête vers le serveur cible
     response = await forward_request(request, TARGET_URL, path)
