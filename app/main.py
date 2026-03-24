@@ -1,27 +1,26 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from dotenv import load_dotenv
 import os
+
 from .proxy import forward_request
 from .logger import log_request
-from .rule_engine import check_request
+from .rule_engine import analyze_request, block_response
 
-
-# Charge la configuration depuis .env
 load_dotenv()
-TARGET_URL = os.getenv("TARGET_URL", "http://localhost:9001")  # Valeur par défaut
+TARGET_URL = os.getenv("TARGET_URL", "http://localhost:9001")
 
-# Création de l'application WAF
 waf = FastAPI()
 
 @waf.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def proxy_request(path: str, request: Request):
-    
     client_ip = request.client.host if request.client else "unknown"
     method = request.method
 
-    # Log de la requête entrante
     log_request(client_ip, method, path)
-    # Forward de la requête vers le serveur cible
+
+    is_blocked, reason, detail = await analyze_request(request)
+    if is_blocked:
+        return block_response(reason, detail)
+
     response = await forward_request(request, TARGET_URL, path)
     return response
-

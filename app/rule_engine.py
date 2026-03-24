@@ -1,100 +1,68 @@
 import re
+import json
+import os
 from fastapi import Request
+from fastapi.responses import Response
 
-# ──────────────────────────────────────────────────────────────────────────────
-# RÈGLES SQLi — inspirées de l'OWASP CRS (règles 942xxx)
-# Source : https://github.com/coreruleset/coreruleset
-# ──────────────────────────────────────────────────────────────────────────────
-SQLI_PATTERNS = [
-    re.compile(r"(?i)(\bselect\b.+\bfrom\b)"),        # SELECT ... FROM
-    re.compile(r"(?i)(\bunion\b.+\bselect\b)"),        # UNION SELECT
-    re.compile(r"(?i)(\bor\b\s+\d+\s*=\s*\d+)"),          # OR 1=1
-    re.compile(r"(?i)(\bor\b\s*'[^']*'\s*=)"),             # OR '1'=
-    re.compile(r"(?i)(\band\b\s+\d+\s*=\s*\d+)"),         # AND 1=1
-    re.compile(r"(?i)(\band\b\s*'[^']*'\s*=)"),           # AND '1'=
-    re.compile(r"(?i)(\bdrop\s+table\b)"),             # DROP TABLE
-    re.compile(r"(?i)(\binsert\s+into\b)"),            # INSERT INTO
-    re.compile(r"(?i)(\bdelete\s+from\b)"),            # DELETE FROM
-    re.compile(r"(?i)(--|;|\/\*|\*\/)"),               # Commentaires SQL
-    re.compile(r"(?i)(\bsleep\s*\()"),                 # SLEEP() - blind SQLi
-    re.compile(r"(?i)(\bbenchmark\s*\()"),             # BENCHMARK() - blind SQLi
-]
+RULES_FILE = "parsed_rules.json"
+_compiled_rules: dict[str, list[re.Pattern]] = {}
 
-# ──────────────────────────────────────────────────────────────────────────────
-# RÈGLES XSS — inspirées de l'OWASP CRS (règles 941xxx)
-# Source : https://github.com/coreruleset/coreruleset
-# ──────────────────────────────────────────────────────────────────────────────
-XSS_PATTERNS = [
-    re.compile(r"(?i)<script[^>]*>"),                  # <script>
-    re.compile(r"(?i)<\/script>"),                     # </script>
-    re.compile(r"(?i)(javascript\s*:)"),               # javascript:
-    re.compile(r"(?i)(onerror\s*=)"),                  # onerror=
-    re.compile(r"(?i)(onload\s*=)"),                   # onload=
-    re.compile(r"(?i)(onclick\s*=)"),                  # onclick=
-    re.compile(r"(?i)(onmouseover\s*=)"),              # onmouseover=
-    re.compile(r"(?i)<iframe[^>]*>"),                  # <iframe>
-    re.compile(r"(?i)(alert\s*\()"),                   # alert()
-    re.compile(r"(?i)(document\.cookie)"),             # document.cookie
-]
+def load_rules():
+    global _compiled_rules
+    if not os.path.exists(RULES_FILE):
+        print(f"[WARN] '{RULES_FILE}' introuvable. Lance parse_rules.py d'abord.")
+        return
+    with open(RULES_FILE, "r", encoding="utf-8") as f:
+        raw_rules = json.load(f)
+    total = 0
+    for category, patterns in raw_rules.items():
+        compiled = []
+        for pattern in patterns:
+            try:
+                compiled.append(re.compile(pattern, re.IGNORECASE))
+                total += 1
+            except re.error:
+                pass
+        _compiled_rules[category] = compiled
+    print(f"[WAF] ✅ {total} règles OWASP chargées ({len(_compiled_rules)} catégories)")
 
+def _check_value(value: str) -> tuple[bool, str, str]:
+    for category, patterns in _compiled_rules.items():
+        for pattern in patterns:
+            if pattern.search(value):
+                return True, category, pattern.pattern[:80]
+    return False, "", ""
 
-def _match_patterns(value: str, patterns: list) -> str | None:
-    """
-    Vérifie si une valeur correspond à l'un des patterns.
-    Retourne la description du pattern trouvé, ou None si aucun match.
-    """
-    for pattern in patterns:
-        if pattern.search(value):
-            return pattern.pattern
-    return None
+async def analyze_request(request: Request) -> tuple[bool, str, str]:
+    for param_name, param_value in request.query_params.items():
+        is_malicious, category, pattern = _check_value(param_value)
+        if is_malicious:
+            return True, f"Attaque dans le paramètre GET '{param_name}'", f"Catégorie: {category} | Pattern: {pattern}"
 
-
-async def check_request(request: Request) -> dict:
-    """
-    Inspecte la requête entrante contre les règles SQLi et XSS.
-    Retourne un dictionnaire :
-      - {"blocked": False}                        si la requête est saine
-      - {"blocked": True, "type": "...", "reason": "...", "location": "..."}  si attaque détectée
-    """
-    # ── 1. Collecter toutes les valeurs à inspecter ──────────────────────────
-
-    inputs = {}
-
-    # Paramètres GET (query string) ex: ?id=1 OR 1=1
-    for key, value in request.query_params.items():
-        inputs[f"query_param:{key}"] = value
-
-    # Corps de la requête (POST/PUT) ex: formulaire ou JSON
     try:
-        body = await request.body()
-        if body:
-            inputs["body"] = body.decode("utf-8", errors="ignore")
+        body_bytes = await request.body()
+        if body_bytes:
+            body_text = body_bytes.decode("utf-8", errors="ignore")
+            is_malicious, category, pattern = _check_value(body_text)
+            if is_malicious:
+                return True, "Attaque dans le body", f"Catégorie: {category} | Pattern: {pattern}"
     except Exception:
         pass
 
-    # ── 2. Vérifier chaque valeur contre les règles ──────────────────────────
+    for header_name in ["user-agent", "referer", "x-forwarded-for", "cookie"]:
+        header_value = request.headers.get(header_name, "")
+        if header_value:
+            is_malicious, category, pattern = _check_value(header_value)
+            if is_malicious:
+                return True, f"Attaque dans le header '{header_name}'", f"Catégorie: {category} | Pattern: {pattern}"
 
-    for location, value in inputs.items():
+    return False, "", ""
 
-        # Vérification SQLi
-        match = _match_patterns(value, SQLI_PATTERNS)
-        if match:
-            return {
-                "blocked": True,
-                "type": "SQLi",
-                "reason": f"Patron détecté : {match}",
-                "location": location,
-            }
+def block_response(reason: str, detail: str) -> Response:
+    return Response(
+        content=f"403 Forbidden\n\nRaison: {reason}\n{detail}",
+        status_code=403,
+        media_type="text/plain"
+    )
 
-        # Vérification XSS
-        match = _match_patterns(value, XSS_PATTERNS)
-        if match:
-            return {
-                "blocked": True,
-                "type": "XSS",
-                "reason": f"Patron détecté : {match}",
-                "location": location,
-            }
-
-    # ── 3. Aucune attaque détectée ───────────────────────────────────────────
-    return {"blocked": False}
+load_rules()
