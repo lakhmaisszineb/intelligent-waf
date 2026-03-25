@@ -25,15 +25,11 @@ def extract_patterns_from_file(filepath):
     patterns = []
     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
-    rx_matches = re.findall(r'@rx\s+"?([^"\\n]+)"?', content)
+    # CRS format: "@rx PATTERN" — opening quote is before @rx
+    rx_matches = re.findall(r'"@rx ([^"]+)"', content)
     for pattern in rx_matches:
-        pattern = pattern.strip().strip('"').strip("'")
-        if len(pattern) > 3:
-            patterns.append(pattern)
-    rx_quoted = re.findall(r'@rx\s+"([^"]+)"', content)
-    for pattern in rx_quoted:
         pattern = pattern.strip()
-        if pattern not in patterns and len(pattern) > 3:
+        if len(pattern) > 3:
             patterns.append(pattern)
     return patterns
 
@@ -57,7 +53,7 @@ def parse_all_rules():
     for filename in sorted(conf_files):
         filepath = os.path.join(RULES_DIR, filename)
         category = get_category(filename)
-        print(f"[PARSE] {filename} → {category}")
+        print(f"[PARSE] {filename} -> {category}")
         patterns = extract_patterns_from_file(filepath)
         valid_patterns = [p for p in patterns if validate_pattern(p)]
         unique_patterns = list(dict.fromkeys(valid_patterns))

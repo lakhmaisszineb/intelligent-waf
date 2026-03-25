@@ -24,7 +24,7 @@ def load_rules():
             except re.error:
                 pass
         _compiled_rules[category] = compiled
-    print(f"[WAF] ✅ {total} règles OWASP chargées ({len(_compiled_rules)} catégories)")
+    print(f"[WAF] ça marche bien, {total} règles OWASP chargées ({len(_compiled_rules)} catégories)")
 
 def _check_value(value: str) -> tuple[bool, str, str]:
     for category, patterns in _compiled_rules.items():
@@ -48,8 +48,8 @@ async def analyze_request(request: Request) -> tuple[bool, str, str]:
                 return True, "Attaque dans le body", f"Catégorie: {category} | Pattern: {pattern}"
     except Exception:
         pass
-
-    for header_name in ["user-agent", "referer", "x-forwarded-for", "cookie"]:
+#    for header_name in ["user-agent", "referer", "x-forwarded-for", "cookie"]:
+    for header_name in ["user-agent", "x-forwarded-for", "cookie"]:
         header_value = request.headers.get(header_name, "")
         if header_value:
             is_malicious, category, pattern = _check_value(header_value)

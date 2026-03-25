@@ -16,11 +16,12 @@ async def proxy_request(path: str, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     method = request.method
 
-    log_request(client_ip, method, path)
+    is_blocked, reason, detail = await analyze_request(request)  
 
-    is_blocked, reason, detail = await analyze_request(request)
     if is_blocked:
+        log_request(client_ip, method, path, blocked=True, reason=reason, detail=detail)
         return block_response(reason, detail)
 
+    log_request(client_ip, method, path)
     response = await forward_request(request, TARGET_URL, path)
     return response

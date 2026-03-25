@@ -2,7 +2,7 @@ import os
 import urllib.request
 
 RULES_DIR = "rules"
-OWASP_CRS_BASE = "https://raw.githubusercontent.com/coreruleset/coreruleset/v3.3/rules/"
+OWASP_CRS_BASE = "https://raw.githubusercontent.com/coreruleset/coreruleset/v3.3.5/rules/"
 
 RULE_FILES = [
     "REQUEST-942-APPLICATION-ATTACK-SQLI.conf",

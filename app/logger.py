@@ -1,7 +1,5 @@
 import logging
 
-# Configuration du système de logging
-# ------------------------------------------------------
 logging.basicConfig(
     filename="logs/waf.log",
     level=logging.INFO,
@@ -10,13 +8,12 @@ logging.basicConfig(
 
 logger = logging.getLogger("waf")
 
-
-def log_request(client_ip: str, method: str, path: str):
-    if client_ip == "unknown":
+def log_request(client_ip: str, method: str, path: str, blocked: bool = False, reason: str = "", detail: str = ""):
+    if blocked:
         logger.warning(
-            f"Request with unknown IP | METHOD={method} | PATH=/{path}"
+            f"BLOCKED | IP={client_ip} | METHOD={method} | PATH=/{path} | RAISON={reason} | {detail}"
         )
-
-    logger.info(
-        f"Incoming request | IP={client_ip} | METHOD={method} | PATH=/{path}"
-    )
+    else:
+        logger.info(
+            f"ALLOWED | IP={client_ip} | METHOD={method} | PATH=/{path}"
+        )

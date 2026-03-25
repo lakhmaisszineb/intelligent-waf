@@ -219,3 +219,5 @@ test_site.py
 app/main1.py
 .vscode/settings.json
 docs/changes_report.tex
+/rules
+parsed_rules.json
