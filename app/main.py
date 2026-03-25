@@ -11,7 +11,7 @@ TARGET_URL = os.getenv("TARGET_URL", "http://localhost:9001")
 
 waf = FastAPI()
 
-@waf.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
+@waf.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE", "CONNECT"])
 async def proxy_request(path: str, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     method = request.method

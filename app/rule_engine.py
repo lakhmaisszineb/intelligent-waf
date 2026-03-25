@@ -7,6 +7,16 @@ from fastapi.responses import Response
 RULES_FILE = "parsed_rules.json"
 _compiled_rules: dict[str, list[re.Pattern]] = {}
 
+SCANNER_SIGNATURES = re.compile(
+    r"sqlmap|nikto|nmap|nessus|masscan|dirbuster|gobuster|wfuzz|"
+    r"burpsuite|acunetix|openvas|zap|hydra|metasploit|nuclei|"
+    r"zgrab|shodan|censys|python-requests|curl/|wget/",
+    re.IGNORECASE
+)
+
+def check_scanner(user_agent: str) -> bool:
+    return bool(SCANNER_SIGNATURES.search(user_agent))
+
 def load_rules():
     global _compiled_rules
     if not os.path.exists(RULES_FILE):
@@ -33,7 +43,33 @@ def _check_value(value: str) -> tuple[bool, str, str]:
                 return True, category, pattern.pattern[:80]
     return False, "", ""
 
+FORBIDDEN_METHODS = {"TRACE", "CONNECT"}
+
+RATE_LIMIT = 100
+RATE_WINDOW = 60
+_request_counts: dict[str, list] = {}
+
+def check_rate_limit(ip: str) -> bool:
+    import time
+    now = time.time()
+    if ip not in _request_counts:
+        _request_counts[ip] = []
+    _request_counts[ip] = [t for t in _request_counts[ip] if now - t < RATE_WINDOW]
+    _request_counts[ip].append(now)
+    return len(_request_counts[ip]) > RATE_LIMIT
+
 async def analyze_request(request: Request) -> tuple[bool, str, str]:
+    client_ip = request.client.host if request.client else "unknown"
+    if check_rate_limit(client_ip):
+        return True, "Rate limit dépassé", f"IP: {client_ip} | Plus de {RATE_LIMIT} requêtes/{RATE_WINDOW}s"
+
+    if request.method in FORBIDDEN_METHODS:
+        return True, "Méthode HTTP interdite", f"Méthode: {request.method}"
+
+    user_agent = request.headers.get("user-agent", "")
+    if user_agent and check_scanner(user_agent):
+        return True, "Scanner détecté", f"User-Agent: {user_agent[:80]}"
+
     for param_name, param_value in request.query_params.items():
         is_malicious, category, pattern = _check_value(param_value)
         if is_malicious:
@@ -59,9 +95,10 @@ async def analyze_request(request: Request) -> tuple[bool, str, str]:
     return False, "", ""
 
 def block_response(reason: str, detail: str) -> Response:
+    status_code = 429 if "Rate limit" in reason else 403
     return Response(
-        content=f"403 Forbidden\n\nRaison: {reason}\n{detail}",
-        status_code=403,
+        content=f"{status_code} {'Too Many Requests' if status_code == 429 else 'Forbidden'}\n\nRaison: {reason}\n{detail}",
+        status_code=status_code,
         media_type="text/plain"
     )
 
