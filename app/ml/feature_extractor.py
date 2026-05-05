@@ -46,3 +46,15 @@ class FeatureExtractor:
         features['has_encoding'] = int('%' in request and len(re.findall(r'%[0-9a-f]{2}', request)) > 0)
         features['has_url_encoding'] = int('%3c' in request or '%3e' in request or '%3C' in request or '%3E' in request)
         return [features[f] for f in self.xss_features_list]
+
+def extract_unsupervised_features(self, request):
+    request = str(request).lower()
+    features = {}
+    features['length'] = len(request)
+    features['num_special_chars'] = sum(1 for c in request if c in "'\"\\;(){}[]<>%$#@!`~")
+    features['num_spaces'] = request.count(' ')
+    features['num_quotes'] = request.count("'") + request.count('"')
+    features['num_parentheses'] = request.count('(') + request.count(')')
+    features['num_digits'] = sum(c.isdigit() for c in request)
+    features['has_encoding'] = int('%' in request)
+    return [features[f] for f in self.unsupervised_features]
