@@ -46,7 +46,7 @@
 - Date : 3 mars 2026
 - Modification : TARGET_URL configurable via .env ou dans le code
 - Test avec site distant : https://httpbin.org (public, fiable, sans installation)
-- Commande de lancement : uvicorn app.main:app --reload --port 8000
+- Commande de lancement : uvicorn app.main:waf --reload --port 8000
 - Résultat : 
   - http://localhost:8000/anything → JSON de httpbin.org (preuve de forwarding correct)
   - Logs Uvicorn montrent requêtes entrantes et réponses 200 OK
@@ -57,3 +57,6 @@
 - Serveur : Uvicorn sur port 8000 (développement)
 - Site cible test : httpbin.org (public) pour éviter installations complexes
 - Prochaines étapes : ajouter règles de détection (regex SQLi/XSS) + extraction dans rule_engine.py
+
+
+#uvicorn app.main:waf --reload --host 0.0.0.0 --port 8000
