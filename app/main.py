@@ -47,7 +47,7 @@ async def proxy_request(path: str, request: Request):
     if zone == 'attack':
         log_request(client_ip, method, path, blocked=True, reason=f"ML Attack Score: {score:.4f}", detail=zone)
         reputation_engine.update_score(client_ip, is_attack=True, is_grey_zone=False, is_blocked=True)
-        return block_response(f"ML Detection", f"Score: {score:.4f}")
+        return block_response("ML Detection", f"Score: {score:.4f}")
     
     elif zone == 'grey_zone':
         log_request(client_ip, method, path, blocked=False, reason=f"Grey Zone Score: {score:.4f}", detail=zone, alert=True)

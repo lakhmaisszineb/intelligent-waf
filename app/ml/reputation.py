@@ -55,3 +55,14 @@ class IPReputationEngine:
     
     def add_blacklist(self, ip):
         self.blacklist.add(ip)
+    
+    def get_score(self, ip):
+        return self.ip_scores.get(ip, 0)
+    
+    def get_offenses(self, ip):
+        return self.ip_offenses.get(ip, 0)
+    
+    def unblock_ip(self, ip):
+        if ip in self.ip_blocked_until:
+            del self.ip_blocked_until[ip]
+        self.ip_scores[ip] = max(0, self.ip_scores.get(ip, 0) - 50)
