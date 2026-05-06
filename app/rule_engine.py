@@ -40,7 +40,7 @@ def _check_value(value: str) -> tuple[bool, str, str]:
     for category, patterns in _compiled_rules.items():
         for pattern in patterns:
             if pattern.search(value):
-                return True, category, pattern.pattern[:80]
+                return True, category, value[:100]
     return False, "", ""
 
 FORBIDDEN_METHODS = {"TRACE", "CONNECT"}
@@ -71,17 +71,18 @@ async def analyze_request(request: Request) -> tuple[bool, str, str]:
         return True, "Scanner détecté", f"User-Agent: {user_agent[:80]}"
 
     for param_name, param_value in request.query_params.items():
-        is_malicious, category, pattern = _check_value(param_value)
+        is_malicious, category, matched_payload = _check_value(param_value)
         if is_malicious:
-            return True, f"Attaque dans le paramètre GET '{param_name}'", f"Catégorie: {category} | Pattern: {pattern}"
-
+            return True, f"Attaque dans le paramètre GET '{param_name}'", \
+                f"Catégorie={category} | Payload={matched_payload}"
     try:
         body_bytes = await request.body()
         if body_bytes:
             body_text = body_bytes.decode("utf-8", errors="ignore")
-            is_malicious, category, pattern = _check_value(body_text)
+            is_malicious, category, matched_payload = _check_value(body_text)
             if is_malicious:
-                return True, "Attaque dans le body", f"Catégorie: {category} | Pattern: {pattern}"
+                return True, "Attaque dans le body", \
+                    f"Catégorie={category} | Payload={matched_payload}"
     except Exception:
         pass
 #    for header_name in ["user-agent", "referer", "x-forwarded-for", "cookie"]:

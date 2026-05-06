@@ -18,6 +18,7 @@ ml_engine = MLDetectionEngine()
 ml_engine.load_models()
 
 reputation_engine = IPReputationEngine()
+reputation_engine.add_whitelist("127.0.0.1")
 
 @waf.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE", "CONNECT"])
 async def proxy_request(path: str, request: Request):
@@ -36,26 +37,55 @@ async def proxy_request(path: str, request: Request):
         return block_response(reason, detail)
 
     body = await request.body()
-    request_str = f"{method} {path} HTTP/1.1\n"
-    for header, value in request.headers.items():
-        request_str += f"{header}: {value}\n"
-    if body:
-        request_str += f"\n{body.decode('utf-8', errors='ignore')}"
+    query = str(request.url.query)
+    body_str = body.decode('utf-8', errors='ignore') if body else ""
 
-    result, score, zone = ml_engine.detect_attack(request_str)
+    if query:
+        request_str = f"{method} {path}?{query} {body_str}".strip()
+    else:
+        request_str = f"{method} {path} {body_str}".strip()
+
+    result, score, zone, model, attack_type = ml_engine.detect_attack(request_str)
 
     if zone == 'attack':
-        log_request(client_ip, method, path, blocked=True, reason=f"ML Attack Score: {score:.4f}", detail=zone)
-        reputation_engine.update_score(client_ip, is_attack=True, is_grey_zone=False, is_blocked=True)
-        return block_response("ML Detection", f"Score: {score:.4f}")
-    
-    elif zone == 'grey_zone':
-        log_request(client_ip, method, path, blocked=False, reason=f"Grey Zone Score: {score:.4f}", detail=zone, alert=True)
-        reputation_engine.update_score(client_ip, is_attack=True, is_grey_zone=True, is_blocked=False)
-        
-    elif zone == 'normal':
-        log_request(client_ip, method, path, blocked=False, reason=f"Normal Score: {score:.4f}", detail=zone)
-        reputation_engine.update_score(client_ip, is_attack=False, is_grey_zone=False, is_blocked=False)
+        log_request(
+            client_ip, method, path,
+            blocked=True,
+            reason=f"ML Attack Score: {score:.4f}",
+            detail=zone,
+            model=model,
+            attack_type=attack_type,
+            payload=request_str[:100],
+            score=score
+        )
+        return block_response("ML Detection", f"Score: {score:.4f} | {attack_type}")
 
-    response = await forward_request(request, TARGET_URL, path)
-    return response
+    elif zone == 'grey_zone':
+        log_request(
+            client_ip, method, path,
+            blocked=False,
+            reason=f"Grey Zone Score: {score:.4f}",
+            detail=zone,
+            alert=True,
+            model=model,
+            attack_type=attack_type
+        )
+
+    elif zone == 'anomaly_alert':
+        log_request(
+            client_ip, method, path,
+            blocked=False,
+            reason=f"Anomaly Score: {score:.4f}",
+            detail="anomaly_alert",
+            alert=True,
+            model="LOF",
+            attack_type="Anomalie"
+        )
+
+    elif zone == 'normal':
+        log_request(
+            client_ip, method, path,
+            blocked=False,
+            reason=f"Normal Score: {score:.4f}",
+            detail=zone
+        )

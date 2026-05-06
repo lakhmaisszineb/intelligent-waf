@@ -64,22 +64,45 @@ class MLDetectionEngine:
     
     def detect_attack(self, request):
         master_score = self.detect_master(request)
-        
+
         if master_score >= 0.8:
-            return True, master_score, 'attack'
+            # Identifier quel expert confirme
+            sqli_score = self.detect_sqli(request)
+            xss_score  = self.detect_xss(request)
+
+            if sqli_score >= 0.7:
+                attack_type = "SQLi"
+                model_name  = "SQLi_Expert"
+            elif xss_score >= 0.7:
+                attack_type = "XSS"
+                model_name  = "XSS_Expert"
+            else:
+                attack_type = "General"
+                model_name  = "Master_Model"
+
+            return True, master_score, 'attack', model_name, attack_type
+
         elif master_score < 0.5:
             is_anomaly = self.detect_anomaly(request)
             if is_anomaly:
-                return False, master_score, 'anomaly_alert'
-            return False, master_score, 'normal'
+                return False, master_score, 'anomaly_alert', 'LOF', 'Anomalie'
+            return False, master_score, 'normal', '', ''
+
         else:
             sqli_score = self.detect_sqli(request)
-            xss_score = self.detect_xss(request)
+            xss_score  = self.detect_xss(request)
             max_expert_score = max(sqli_score, xss_score)
-            
-            if max_expert_score >= 0.7:
-                return True, max_expert_score, 'attack'
-            elif max_expert_score < 0.4:
-                return False, max_expert_score, 'normal'
+
+            if sqli_score >= xss_score:
+                attack_type = "SQLi"
+                model_name  = "SQLi_Expert"
             else:
-                return None, max_expert_score, 'grey_zone'
+                attack_type = "XSS"
+                model_name  = "XSS_Expert"
+
+            if max_expert_score >= 0.7:
+                return True, max_expert_score, 'attack', model_name, attack_type
+            elif max_expert_score < 0.4:
+                return False, max_expert_score, 'normal', '', ''
+            else:
+                return None, max_expert_score, 'grey_zone', model_name, attack_type
