@@ -8,6 +8,7 @@ from .logger import log_request
 from .rule_engine import analyze_request, block_response
 from app.ml.ml_engine import MLDetectionEngine
 from app.ml.reputation import IPReputationEngine
+from app.ml.feedback import FeedbackCollector
 
 load_dotenv()
 TARGET_URL = os.getenv("TARGET_URL", "http://localhost:9001")
@@ -19,6 +20,9 @@ ml_engine.load_models()
 
 reputation_engine = IPReputationEngine()
 reputation_engine.add_whitelist("127.0.0.1")
+
+# Initialisation du collecteur de feedback pour l'apprentissage continu
+feedback_collector = FeedbackCollector()
 
 @waf.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE", "CONNECT"])
 async def proxy_request(path: str, request: Request):
@@ -47,7 +51,7 @@ async def proxy_request(path: str, request: Request):
 
     result, score, zone, model, attack_type = ml_engine.detect_attack(request_str)
 
-    #  ZONE 1 : ATTAQUE SÛRE 
+    # ZONE 1 : ATTAQUE SÛRE
     if zone == 'attack':
         log_request(
             client_ip, method, path,
@@ -60,9 +64,10 @@ async def proxy_request(path: str, request: Request):
             score=score
         )
         reputation_engine.update_score(client_ip, is_attack=True, is_grey_zone=False, is_blocked=True)
+        feedback_collector.log_decision(request_str, True, score, zone, model, attack_type, client_ip)
         return block_response("ML Detection", f"Score: {score:.4f} | {attack_type}")
 
-    #  ZONE 2 : ZONE GRISE - ATTAQUE CONFIRMÉE PAR EXPERT 
+    # ZONE 2 : ZONE GRISE - ATTAQUE CONFIRMÉE PAR EXPERT
     elif zone == 'grey_zone_attack':
         log_request(
             client_ip, method, path,
@@ -76,9 +81,10 @@ async def proxy_request(path: str, request: Request):
             score=score
         )
         reputation_engine.update_score(client_ip, is_attack=True, is_grey_zone=True, is_blocked=True)
+        feedback_collector.log_decision(request_str, True, score, zone, model, attack_type, client_ip)
         return block_response("ML Grey Zone Detection", f"Score: {score:.4f} | {attack_type} | ALERTE: verification humaine recommandee")
 
-    #  ZONE 3 : ZONE GRISE - PAS D'ATTAQUE CONFIRMÉE 
+    # ZONE 3 : ZONE GRISE - PAS D'ATTAQUE CONFIRMÉE
     elif zone == 'grey_zone_normal':
         log_request(
             client_ip, method, path,
@@ -92,8 +98,9 @@ async def proxy_request(path: str, request: Request):
             score=score
         )
         reputation_engine.update_score(client_ip, is_attack=False, is_grey_zone=True, is_blocked=False)
+        feedback_collector.log_decision(request_str, False, score, zone, model, attack_type, client_ip)
 
-    #  ZONE 4 : NORMAL SÛR 
+    # ZONE 4 : NORMAL SÛR
     elif zone == 'normal':
         log_request(
             client_ip, method, path,
@@ -102,8 +109,9 @@ async def proxy_request(path: str, request: Request):
             detail=zone
         )
         reputation_engine.update_score(client_ip, is_attack=False, is_grey_zone=False, is_blocked=False)
+        feedback_collector.log_decision(request_str, False, score, zone, model, attack_type, client_ip)
 
-    # ##### ANCIENNE ZONE (commentée, plus utilisée) 
+    # ANCIENNE ZONE (commentée, plus utilisée)
     # elif zone == 'grey_zone':
     #     log_request(
     #         client_ip, method, path,
@@ -115,7 +123,7 @@ async def proxy_request(path: str, request: Request):
     #         attack_type=attack_type
     #     )
 
-    # ###### ANCIENNE ZONE (commentée, plus utilisée) 
+    # ANCIENNE ZONE (commentée, plus utilisée)
     # elif zone == 'anomaly_alert':
     #     log_request(
     #         client_ip, method, path,
@@ -127,6 +135,6 @@ async def proxy_request(path: str, request: Request):
     #         attack_type="Anomalie"
     #     )
 
-    #  FORWARD POUR LES REQUÊTES NON BLOQUÉES 
+    # FORWARD POUR LES REQUÊTES NON BLOQUÉES
     if zone != 'attack' and zone != 'grey_zone_attack':
-        return await forward_request(request, TARGET_URL)
+        return await forward_request(request, path, TARGET_URL)
