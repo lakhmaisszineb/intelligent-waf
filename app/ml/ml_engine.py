@@ -54,55 +54,63 @@ class MLDetectionEngine:
         score = self.master_model.predict_proba(features_array)[0][1]
         return score
     
-    def detect_anomaly(self, request):
+    # def detect_anomaly(self, request):
+    #     if self.isolation_forest is None:
+    #         return False
+    #     features = self.feature_extractor.extract_unsupervised_features(request)
+    #     features_array = np.array(features).reshape(1, -1)
+    #     prediction = self.isolation_forest.predict(features_array)
+    #     return prediction[0] == -1
+    def detect_anomaly_score(self, request):
+        """Retourne un SCORE CONTINU entre 0 et 1 (1 = très anormal)"""
         if self.isolation_forest is None:
-            return False
+            return 0.0
         features = self.feature_extractor.extract_unsupervised_features(request)
         features_array = np.array(features).reshape(1, -1)
-        prediction = self.isolation_forest.predict(features_array)
-        return prediction[0] == -1
-    
+        # score_samples() retourne un score négatif : plus c'est négatif = plus c'est normal
+        # On le transforme en probabilité entre 0 et 1
+        raw_score = self.isolation_forest.score_samples(features_array)[0]
+        # Normalisation : transformer en 0 (normal) à 1 (anomalie)
+        anomaly_score = 1.0 / (1.0 + np.exp(raw_score))  # sigmoid inverse
+        return anomaly_score
+        
+            
     def detect_attack(self, request):
+        # Étape 1 : Les DEUX modèles tournent EN PARALLÈLE
         master_score = self.detect_master(request)
-
-        if master_score >= 0.8:
-            # Identifier quel expert confirme
-            sqli_score = self.detect_sqli(request)
-            xss_score  = self.detect_xss(request)
-
-            if sqli_score >= 0.7:
-                attack_type = "SQLi"
-                model_name  = "SQLi_Expert"
-            elif xss_score >= 0.7:
-                attack_type = "XSS"
-                model_name  = "XSS_Expert"
-            else:
-                attack_type = "General"
-                model_name  = "Master_Model"
-
-            return True, master_score, 'attack', model_name, attack_type
-
-        elif master_score < 0.5:
-            is_anomaly = self.detect_anomaly(request)
-            if is_anomaly:
-                return False, master_score, 'anomaly_alert', 'LOF', 'Anomalie'
-            return False, master_score, 'normal', '', ''
-
+        anomaly_score = self.detect_anomaly_score(request)  # Score continu 0→1
+        
+        # Étape 2 : Fusion équilibrée des deux scores
+        # Poids : 60% master (supervisé, plus fiable) + 40% anomaly (non-supervisé)
+        # combined_score = (0.6 * master_score) + (0.4 * anomaly_score)
+        combined_score = (master_score + anomaly_score) / 2  # Moyenne simple 
+        
+        # Étape 3 : Arbre de décision basé sur le score COMBINÉ
+        if combined_score >= 0.8:
+            # ATTAQUE SÛRE → bloquer, pas besoin d'experts
+            return True, combined_score, 'attack', 'Master_Model', 'General'
+        
+        elif combined_score < 0.5:
+            # NORMAL SÛR → autoriser directement
+            return False, combined_score, 'normal', '', ''
+        
         else:
+            # ZONE GRISE → EXPERTS
             sqli_score = self.detect_sqli(request)
-            xss_score  = self.detect_xss(request)
+            xss_score = self.detect_xss(request)
             max_expert_score = max(sqli_score, xss_score)
-
+            
             if sqli_score >= xss_score:
                 attack_type = "SQLi"
-                model_name  = "SQLi_Expert"
+                model_name = "SQLi_Expert"
             else:
                 attack_type = "XSS"
-                model_name  = "XSS_Expert"
-
+                model_name = "XSS_Expert"
+            
             if max_expert_score >= 0.7:
-                return True, max_expert_score, 'attack', model_name, attack_type
-            elif max_expert_score < 0.4:
-                return False, max_expert_score, 'normal', '', ''
+                # Expert confirme → BLOQUER + ALERTE
+                return True, max_expert_score, 'grey_zone_attack', model_name, attack_type
             else:
-                return None, max_expert_score, 'grey_zone', model_name, attack_type
+                # Expert pas sûr → AUTORISER + ALERTE
+                return False, max_expert_score, 'grey_zone_normal', model_name, attack_type
+            
