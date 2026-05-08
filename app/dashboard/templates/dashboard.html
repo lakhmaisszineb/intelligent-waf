@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intelligent WAF — Security Dashboard</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- DataTables Bootstrap5 -->
+  <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────────── */
+    :root {
+      --sb-w:       260px;
+      --sb-bg:      #1e293b;
+      --sb-txt:     rgba(255,255,255,.72);
+      --sb-txt-hi:  #fff;
+      --sb-accent:  #3b82f6;
+      --pg-bg:      #f1f5f9;
+      --card-bg:    #fff;
+      --border:     #e2e8f0;
+      --txt-1:      #0f172a;
+      --txt-2:      #64748b;
+      --hdr-h:      60px;
+    }
+
+    /* ── Reset / base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--pg-bg);
+      color: var(--txt-1);
+      font-size: 14px;
+    }
+    .app { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ───────────────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sb-w);
+      background: var(--sb-bg);
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      overflow-y: auto;
+    }
+
+    .sb-brand {
+      padding: 18px 22px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .sb-brand-icon { font-size: 22px; }
+    .sb-brand-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--sb-txt-hi);
+      line-height: 1.2;
+    }
+    .sb-brand-sub {
+      font-size: 10px;
+      color: var(--sb-txt);
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+
+    .sb-nav { padding: 12px 0; flex: 1; }
+    .sb-section {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: rgba(255,255,255,.3);
+      padding: 10px 22px 4px;
+    }
+    .sb-item { margin: 1px 10px; }
+    .sb-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 14px;
+      border-radius: 7px;
+      color: var(--sb-txt);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .12s, color .12s;
+      user-select: none;
+    }
+    .sb-link:hover { background: rgba(255,255,255,.07); color: var(--sb-txt-hi); }
+    .sb-link.active { background: rgba(59,130,246,.22); color: var(--sb-txt-hi); }
+    .sb-link.active .sb-icon { color: var(--sb-accent); }
+    .sb-icon { font-size: 15px; width: 17px; flex-shrink: 0; }
+    .sb-badge {
+      margin-left: auto;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 20px;
+      background: rgba(59,130,246,.35);
+      color: #fff;
+    }
+
+    .sb-footer {
+      padding: 14px 22px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .waf-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--sb-txt);
+    }
+    .pulse-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      flex-shrink: 0;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,.6); }
+      50%      { opacity: .7; box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+    }
+
+    /* ── Main ──────────────────────────────────────────────────────── */
+    .main { margin-left: var(--sb-w); flex: 1; display: flex; flex-direction: column; }
+
+    /* ── Header ────────────────────────────────────────────────────── */
+    .hdr {
+      height: var(--hdr-h);
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 500;
+    }
+    .hdr-title { font-size: 17px; font-weight: 700; }
+    .hdr-actions { display: flex; align-items: center; gap: 14px; }
+    .hdr-ts { font-size: 11px; color: var(--txt-2); }
+
+    /* ── Content ───────────────────────────────────────────────────── */
+    .content { padding: 22px; }
+
+    /* ── Sections ──────────────────────────────────────────────────── */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ── KPI cards ─────────────────────────────────────────────────── */
+    .kpi {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 18px 14px;
+      position: relative;
+      overflow: hidden;
+      transition: transform .12s, box-shadow .12s;
+    }
+    .kpi:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.07); }
+    .kpi::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .kpi-blue::before   { background: #3b82f6; }
+    .kpi-red::before    { background: #ef4444; }
+    .kpi-orange::before { background: #f97316; }
+    .kpi-green::before  { background: #22c55e; }
+    .kpi-purple::before { background: #8b5cf6; }
+    .kpi-cyan::before   { background: #06b6d4; }
+
+    .kpi-ico {
+      width: 40px; height: 40px;
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    .kpi-blue   .kpi-ico { background: #eff6ff; color: #3b82f6; }
+    .kpi-red    .kpi-ico { background: #fef2f2; color: #ef4444; }
+    .kpi-orange .kpi-ico { background: #fff7ed; color: #f97316; }
+    .kpi-green  .kpi-ico { background: #f0fdf4; color: #22c55e; }
+    .kpi-purple .kpi-ico { background: #f5f3ff; color: #8b5cf6; }
+    .kpi-cyan   .kpi-ico { background: #ecfeff; color: #06b6d4; }
+
+    .kpi-val { font-size: 26px; font-weight: 800; line-height: 1; margin-bottom: 3px; }
+    .kpi-lbl { font-size: 12px; color: var(--txt-2); font-weight: 500; }
+
+    /* ── Chart / table card ────────────────────────────────────────── */
+    .card-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .cp-hdr {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .cp-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--txt-1);
+    }
+    .cp-body { padding: 18px; }
+
+    /* ── Logs table ─────────────────────────────────────────────────── */
+    table.dataTable thead th {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--txt-2);
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border) !important;
+    }
+    table.dataTable tbody td { font-size: 12px; vertical-align: middle; }
+    table.dataTable tbody tr:hover { background: #f8fafc !important; }
+    .payload-tag {
+      font-family: monospace;
+      font-size: 11px;
+      background: #fef2f2;
+      color: #dc2626;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .dataTables_wrapper .dataTables_filter input {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+    .dataTables_wrapper .dataTables_length select {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate { font-size: 12px; }
+
+    /* ── Model cards ───────────────────────────────────────────────── */
+    .model-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      height: 100%;
+    }
+    .model-ico {
+      width: 38px; height: 38px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+      margin-bottom: 10px;
+    }
+    .model-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+    .model-type { font-size: 11px; color: var(--txt-2); margin-bottom: 12px; }
+
+    /* ── IP manager ─────────────────────────────────────────────────── */
+    .ip-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .ip-row:last-child { border: none; }
+    .ip-lbl { color: var(--txt-2); }
+    .ip-val { font-weight: 600; }
+
+    /* ── Refresh spinner ───────────────────────────────────────────── */
+    .spin { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: rot .55s linear infinite; }
+    @keyframes rot { to { transform: rotate(360deg); } }
+
+    /* ── Timeline interval buttons ──────────────────────────────────── */
+    .interval-btn { font-size: 11px !important; padding: 2px 9px !important; }
+    .interval-btn.active { background: var(--sb-accent) !important; color: #fff !important; border-color: var(--sb-accent) !important; }
+  </style>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- SIDEBAR                                                         -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <span class="sb-brand-icon">🛡️</span>
+      <div>
+        <div class="sb-brand-name">Intelligent WAF</div>
+        <div class="sb-brand-sub">Security Dashboard</div>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <div class="sb-section">Monitoring</div>
+
+      <div class="sb-item">
+        <div class="sb-link active" onclick="showSection('overview')">
+          <i class="bi bi-speedometer2 sb-icon"></i>
+          Overview
+        </div>
+      </div>
+      <div class="sb-item">
+        <div class="sb-link" onclick="showSection('logs')">
+          <i class="bi bi-list-ul sb-icon"></i>
+          Event Logs
+          <span class="sb-badge" id="badge-total">—</span>
+        </div>
+      </div>
+
+      <div class="sb-section" style="margin-top:6px">Management</div>
+
+      <div class="sb-item">
+        <div class="sb-link" onclick="showSection('ip-manager')">
+          <i class="bi bi-shield-lock sb-icon"></i>
+          IP Manager
+        </div>
+      </div>
+      <div class="sb-item">
+        <div class="sb-link" onclick="showSection('ml-models')">
+          <i class="bi bi-cpu sb-icon"></i>
+          ML Models
+        </div>
+      </div>
+    </nav>
+
+    <div class="sb-footer">
+      <div class="waf-status">
+        <div class="pulse-dot"></div>
+        <span>WAF Active</span>
+        <span class="badge bg-success ms-auto" style="font-size:10px;padding:3px 8px">Online</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- MAIN                                                            -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- ── Header ─────────────────────────────────────────────────── -->
+    <header class="hdr">
+      <div class="hdr-title" id="hdr-title">Overview</div>
+      <div class="hdr-actions">
+        <div class="hdr-ts">
+          Last update:&nbsp;<span id="ts-display">—</span>
+        </div>
+        <button class="btn btn-sm btn-primary d-flex align-items-center gap-1"
+                id="btn-refresh" onclick="manualRefresh()">
+          <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+        <span class="hdr-ts text-muted">
+          Auto <span id="countdown">30</span>s
+        </span>
+      </div>
+    </header>
+
+    <!-- ── Content ────────────────────────────────────────────────── -->
+    <div class="content">
+
+      <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+      <!-- OVERVIEW                                                    -->
+      <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+      <section class="section active" id="section-overview">
+
+        <!-- KPI row -->
+        <div class="row g-3 mb-4">
+          <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi kpi-blue">
+              <div class="kpi-ico"><i class="bi bi-activity"></i></div>
+              <div class="kpi-val" id="k-total">—</div>
+              <div class="kpi-lbl">Total Requests</div>
+            </div>
+          </div>
+          <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi kpi-red">
+              <div class="kpi-ico"><i class="bi bi-slash-circle"></i></div>
+              <div class="kpi-val" id="k-blocked">—</div>
+              <div class="kpi-lbl">Blocked</div>
+            </div>
+          </div>
+          <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi kpi-orange">
+              <div class="kpi-ico"><i class="bi bi-exclamation-triangle"></i></div>
+              <div class="kpi-val" id="k-alerts">—</div>
+              <div class="kpi-lbl">Alerts</div>
+            </div>
+          </div>
+          <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi kpi-green">
+              <div class="kpi-ico"><i class="bi bi-check-circle"></i></div>
+              <div class="kpi-val" id="k-allowed">—</div>
+              <div class="kpi-lbl">Allowed</div>
+            </div>
+          </div>
+          <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi kpi-purple">
+              <div class="kpi-ico"><i class="bi bi-funnel"></i></div>
+              <div class="kpi-val" id="k-rules">—</div>
+              <div class="kpi-lbl">Blocked by Rules</div>
+            </div>
+          </div>
+          <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="kpi kpi-cyan">
+              <div class="kpi-ico"><i class="bi bi-robot"></i></div>
+              <div class="kpi-val" id="k-ml">—</div>
+              <div class="kpi-lbl">Blocked by ML</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts row 1: Pie + Line -->
+        <div class="row g-3 mb-3">
+          <div class="col-xl-4 col-lg-5">
+            <div class="card-panel h-100">
+              <div class="cp-hdr">
+                <span class="cp-title">
+                  <i class="bi bi-pie-chart me-1 text-primary"></i>Attacks by Type
+                </span>
+              </div>
+              <div class="cp-body d-flex align-items-center justify-content-center"
+                   style="min-height:270px">
+                <canvas id="ch-pie"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="col-xl-8 col-lg-7">
+            <div class="card-panel h-100">
+              <div class="cp-hdr">
+                <span class="cp-title">
+                  <i class="bi bi-graph-up me-1 text-primary"></i>Event Timeline
+                </span>
+                <div class="btn-group btn-group-sm" role="group">
+                  <button class="btn btn-outline-secondary interval-btn active"
+                          onclick="changeInterval(this,'hour')">Hour</button>
+                  <button class="btn btn-outline-secondary interval-btn"
+                          onclick="changeInterval(this,'minute')">Min</button>
+                  <button class="btn btn-outline-secondary interval-btn"
+                          onclick="changeInterval(this,'day')">Day</button>
+                </div>
+              </div>
+              <div class="cp-body" style="min-height:270px">
+                <canvas id="ch-line"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts row 2: Top IPs + Models perf -->
+        <div class="row g-3">
+          <div class="col-xl-6">
+            <div class="card-panel h-100">
+              <div class="cp-hdr">
+                <span class="cp-title">
+                  <i class="bi bi-geo-alt me-1 text-danger"></i>Top 10 Attacking IPs
+                </span>
+              </div>
+              <div class="cp-body" style="min-height:260px">
+                <canvas id="ch-ips"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="col-xl-6">
+            <div class="card-panel h-100">
+              <div class="cp-hdr">
+                <span class="cp-title">
+                  <i class="bi bi-bar-chart me-1 text-primary"></i>ML Models — Detections
+                </span>
+              </div>
+              <div class="cp-body" style="min-height:260px">
+                <canvas id="ch-models"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+      <!-- LOGS                                                        -->
+      <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+      <section class="section" id="section-logs">
+        <div class="card-panel">
+          <div class="cp-hdr">
+            <span class="cp-title">
+              <i class="bi bi-list-ul me-1 text-primary"></i>WAF Event Logs
+            </span>
+            <!-- Status filter -->
+            <div class="btn-group btn-group-sm" role="group" id="status-grp">
+              <button class="btn btn-outline-secondary active"
+                      onclick="filterStatus(this, null)">All</button>
+              <button class="btn btn-outline-danger"
+                      onclick="filterStatus(this,'BLOCKED')">Blocked</button>
+              <button class="btn btn-outline-warning"
+                      onclick="filterStatus(this,'ALERT')">Alert</button>
+              <button class="btn btn-outline-success"
+                      onclick="filterStatus(this,'ALLOWED')">Allowed</button>
+            </div>
+            <!-- Category filter -->
+            <select class="form-select form-select-sm" style="width:155px"
+                    id="cat-filter" onchange="applyLogFilters()">
+              <option value="">All categories</option>
+              <option value="sql_injection">SQL Injection</option>
+              <option value="xss">XSS</option>
+              <option value="lfi">LFI</option>
+              <option value="rce">RCE</option>
+              <option value="php_injection">PHP Injection</option>
+            </select>
+          </div>
+          <div class="cp-body p-0 px-3 pb-3">
+            <table id="logs-tbl" class="table table-hover table-sm w-100">
+              <thead>
+                <tr>
+                  <th>Timestamp</th><th>IP</th><th>Method</th><th>Path</th>
+                  <th>Status</th><th>Category</th><th>Model</th>
+                  <th>Score</th><th>Payload</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+      <!-- IP MANAGER                                                  -->
+      <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+      <section class="section" id="section-ip-manager">
+        <div class="row g-4">
+
+          <!-- Whitelist -->
+          <div class="col-md-6">
+            <div class="card-panel h-100">
+              <div class="cp-hdr">
+                <span class="cp-title">
+                  <i class="bi bi-shield-check me-1 text-success"></i>Whitelist
+                </span>
+              </div>
+              <div class="cp-body">
+                <p class="text-muted mb-3" style="font-size:12px">
+                  IPs in this list bypass all WAF rules and ML checks.
+                </p>
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control" id="wl-ip"
+                         placeholder="e.g. 192.168.1.10"
+                         onkeydown="if(event.key==='Enter') addWhitelist()">
+                  <button class="btn btn-success" onclick="addWhitelist()">
+                    <i class="bi bi-plus-circle me-1"></i>Add
+                  </button>
+                </div>
+                <div id="wl-fb" class="mt-2" style="min-height:22px;font-size:12px"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blacklist -->
+          <div class="col-md-6">
+            <div class="card-panel h-100">
+              <div class="cp-hdr">
+                <span class="cp-title">
+                  <i class="bi bi-shield-x me-1 text-danger"></i>Blacklist
+                </span>
+              </div>
+              <div class="cp-body">
+                <p class="text-muted mb-3" style="font-size:12px">
+                  IPs in this list are permanently blocked before any analysis.
+                </p>
+                <div class="input-group input-group-sm">
+                  <input type="text" class="form-control" id="bl-ip"
+                         placeholder="e.g. 10.0.0.55"
+                         onkeydown="if(event.key==='Enter') addBlacklist()">
+                  <button class="btn btn-danger" onclick="addBlacklist()">
+                    <i class="bi bi-ban me-1"></i>Block
+                  </button>
+                </div>
+                <div id="bl-fb" class="mt-2" style="min-height:22px;font-size:12px"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- IP Lookup -->
+          <div class="col-12">
+            <div class="card-panel">
+              <div class="cp-hdr">
+                <span class="cp-title">
+                  <i class="bi bi-search me-1 text-primary"></i>IP Status Lookup
+                </span>
+              </div>
+              <div class="cp-body">
+                <div class="row g-2 mb-3">
+                  <div class="col-sm-9">
+                    <input type="text" class="form-control form-control-sm" id="lkp-ip"
+                           placeholder="Enter IP address…"
+                           onkeydown="if(event.key==='Enter') lookupIp()">
+                  </div>
+                  <div class="col-sm-3">
+                    <button class="btn btn-sm btn-primary w-100" onclick="lookupIp()">
+                      <i class="bi bi-search me-1"></i>Check
+                    </button>
+                  </div>
+                </div>
+                <div id="ip-result" style="display:none;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:14px">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+      <!-- ML MODELS                                                   -->
+      <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
+      <section class="section" id="section-ml-models">
+        <div class="row g-3 mb-4" id="ml-cards">
+          <!-- Filled by JS -->
+        </div>
+        <div class="card-panel">
+          <div class="cp-hdr">
+            <span class="cp-title">
+              <i class="bi bi-bar-chart-steps me-1 text-primary"></i>
+              Detection Score Comparison
+            </span>
+          </div>
+          <div class="cp-body" style="min-height:300px">
+            <canvas id="ch-ml-detail"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /content -->
+  </main>
+</div><!-- /app -->
+
+<!-- Toast container -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index:9999">
+  <div id="toasts"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SCRIPTS                                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+<script>
+/* ───────────────────────────────────────────────────────────────────
+   STATE
+─────────────────────────────────────────────────────────────────── */
+const CH = {};                   // Chart instances keyed by id
+let   DT = null;                 // DataTable instance
+let   activeStatus   = null;     // current log status filter
+let   activeInterval = 'hour';   // timeline bucket
+let   autoTimer      = null;
+let   cdTimer        = null;
+let   cdVal          = 30;
+const AUTO_MS = 30000;
+
+/* ───────────────────────────────────────────────────────────────────
+   COLOUR PALETTE
+─────────────────────────────────────────────────────────────────── */
+const C = {
+  blocked : '#ef4444',
+  alerts  : '#f97316',
+  allowed : '#22c55e',
+  blue    : '#3b82f6',
+  purple  : '#8b5cf6',
+  cyan    : '#06b6d4',
+  cats    : ['#3b82f6','#ef4444','#f97316','#22c55e',
+             '#8b5cf6','#06b6d4','#ec4899','#eab308','#14b8a6','#f43f5e'],
+};
+
+/* ───────────────────────────────────────────────────────────────────
+   UTILITIES
+─────────────────────────────────────────────────────────────────── */
+const esc = s => String(s??'').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtTs(ts) {
+  if (!ts) return '—';
+  return String(ts).replace('T',' ').slice(0,19);
+}
+
+function statusBadge(s) {
+  const m = {BLOCKED:'danger', ALERT:'warning', ALLOWED:'success'};
+  const cls = m[s] || 'secondary';
+  return `<span class="badge bg-${cls}" style="font-size:10px">${esc(s)}</span>`;
+}
+
+function scoreCell(v) {
+  if (!v) return '<span class="text-muted">—</span>';
+  const p   = (v * 100).toFixed(1);
+  const cls = v >= .8 ? 'danger' : v >= .5 ? 'warning' : 'secondary';
+  const txt = v >= .8 ? 'text-white' : v >= .5 ? 'text-dark' : 'text-white';
+  return `<span class="badge bg-${cls} ${txt}" style="font-size:10px">${p}%</span>`;
+}
+
+function toast(msg, type='success') {
+  const id  = 'toast-' + Date.now();
+  const bg  = type==='success'?'bg-success':type==='danger'?'bg-danger':'bg-info';
+  document.getElementById('toasts').insertAdjacentHTML('beforeend',
+    `<div id="${id}" class="toast align-items-center text-white ${bg} border-0" role="alert">
+       <div class="d-flex">
+         <div class="toast-body" style="font-size:12px">${esc(msg)}</div>
+         <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                 data-bs-dismiss="toast"></button>
+       </div>
+     </div>`);
+  const el = document.getElementById(id);
+  new bootstrap.Toast(el, {delay:3200}).show();
+  el.addEventListener('hidden.bs.toast', () => el.remove());
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   API HELPERS
+─────────────────────────────────────────────────────────────────── */
+async function get(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+async function post(url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({detail:'Request failed'}));
+    throw new Error(e.detail || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   CHART INIT  (called once at DOMContentLoaded)
+─────────────────────────────────────────────────────────────────── */
+function initCharts() {
+  // Doughnut — attacks by type
+  CH.pie = new Chart(document.getElementById('ch-pie'), {
+    type: 'doughnut',
+    data: { labels:[], datasets:[{data:[], backgroundColor:C.cats,
+            borderWidth:2, borderColor:'#fff', hoverOffset:6}] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend:{ position:'right', labels:{ boxWidth:11, font:{size:11}, padding:10 } },
+        tooltip:{ callbacks:{
+          label: ctx => ` ${ctx.label}: ${ctx.parsed} events`
+        }}
+      }
+    }
+  });
+
+  // Line — event timeline
+  CH.line = new Chart(document.getElementById('ch-line'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label:'Blocked', data:[], borderColor:C.blocked, backgroundColor:'rgba(239,68,68,.10)',  fill:true, tension:.35, pointRadius:3 },
+        { label:'Alerts',  data:[], borderColor:C.alerts,  backgroundColor:'rgba(249,115,22,.08)', fill:true, tension:.35, pointRadius:3 },
+        { label:'Allowed', data:[], borderColor:C.allowed, backgroundColor:'rgba(34,197,94,.06)',  fill:true, tension:.35, pointRadius:3 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ boxWidth:11, font:{size:11} } } },
+      scales:{
+        x:{ ticks:{ font:{size:10}, maxTicksLimit:14, maxRotation:0 } },
+        y:{ beginAtZero:true, ticks:{ font:{size:10}, stepSize:1 } }
+      }
+    }
+  });
+
+  // Horizontal bar — top IPs
+  CH.ips = new Chart(document.getElementById('ch-ips'), {
+    type: 'bar',
+    data: { labels:[], datasets:[{
+      label:'Events', data:[], backgroundColor:C.blocked,
+      borderRadius:4, borderSkipped:false
+    }] },
+    options: {
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ beginAtZero:true, ticks:{font:{size:10}} },
+        y:{ ticks:{ font:{size:11} } }
+      }
+    }
+  });
+
+  // Vertical bar — models detections (Overview)
+  CH.models = new Chart(document.getElementById('ch-models'), {
+    type: 'bar',
+    data: { labels:[], datasets:[{
+      label:'Detections', data:[], backgroundColor:C.blue,
+      borderRadius:5, borderSkipped:false
+    }] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:11}} },
+        y:{ beginAtZero:true, ticks:{font:{size:10}, stepSize:1} }
+      }
+    }
+  });
+
+  // Dual-axis bar — ML Models section detail
+  CH.mlDetail = new Chart(document.getElementById('ch-ml-detail'), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [
+        { label:'Detections', data:[], backgroundColor:C.blue,   borderRadius:5, yAxisID:'y',  order:1 },
+        { label:'Avg Score',  data:[], backgroundColor:C.purple, borderRadius:5, yAxisID:'y2', order:2,
+          type:'line', tension:.3, pointRadius:5, fill:false, borderColor:C.purple, borderWidth:2 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ boxWidth:11, font:{size:11} } } },
+      scales:{
+        y:  { beginAtZero:true, ticks:{font:{size:10}},
+               title:{display:true, text:'Detections', font:{size:10}} },
+        y2: { beginAtZero:true, max:1, position:'right',
+               ticks:{font:{size:10}, callback: v => (v*100).toFixed(0)+'%'},
+               title:{display:true, text:'Avg Score', font:{size:10}},
+               grid:{drawOnChartArea:false} }
+      }
+    }
+  });
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   DATATABLE INIT  (called once)
+─────────────────────────────────────────────────────────────────── */
+function initTable() {
+  DT = $('#logs-tbl').DataTable({
+    data: [],
+    columns: [
+      { data:'timestamp', render: d => `<span style="white-space:nowrap;font-size:11px">${esc(fmtTs(d))}</span>` },
+      { data:'ip',        render: d => `<code style="font-size:11px">${esc(d)}</code>` },
+      { data:'method',    render: d => `<span class="badge bg-light text-dark border" style="font-size:10px">${esc(d)}</span>` },
+      { data:'path',      render: d => `<span style="font-size:11px;max-width:180px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d)}</span>` },
+      { data:'status',    render: statusBadge },
+      { data:'category',  render: d => d ? `<span class="badge bg-light text-dark border" style="font-size:10px">${esc(d)}</span>` : '—' },
+      { data:'model',     render: d => d ? `<span style="color:#8b5cf6;font-size:11px">${esc(d)}</span>` : '—' },
+      { data:'score',     render: scoreCell },
+      { data:'payload',   render: d => d
+          ? `<span class="payload-tag" title="${esc(d)}">${esc(String(d).slice(0,55))}${String(d).length>55?'…':''}</span>`
+          : '<span class="text-muted">—</span>' },
+    ],
+    pageLength: 25,
+    lengthMenu: [10, 25, 50, 100],
+    order: [[0,'desc']],
+    language: {
+      search: 'Search:',
+      lengthMenu: 'Show _MENU_ rows',
+      info: 'Showing _START_–_END_ of _TOTAL_ events',
+      emptyTable: 'No events found.',
+    },
+    dom: '<"d-flex align-items-center justify-content-between mb-2"<"me-2"l>f>rtip',
+  });
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   RENDER HELPERS
+─────────────────────────────────────────────────────────────────── */
+function renderKpis(s) {
+  document.getElementById('k-total').textContent   = s.total   ?? '—';
+  document.getElementById('k-blocked').textContent = s.blocked ?? '—';
+  document.getElementById('k-alerts').textContent  = s.alerts  ?? '—';
+  document.getElementById('k-allowed').textContent = s.allowed ?? '—';
+  document.getElementById('k-rules').textContent   = s.blocked_by_rules ?? '—';
+  document.getElementById('k-ml').textContent      = s.blocked_by_ml    ?? '—';
+  const b = document.getElementById('badge-total');
+  if (b) b.textContent = s.total ?? '—';
+}
+
+function renderPie(data) {
+  CH.pie.data.labels                  = Object.keys(data);
+  CH.pie.data.datasets[0].data        = Object.values(data);
+  CH.pie.update('active');
+}
+
+function renderLine(data) {
+  CH.line.data.labels                 = data.map(b => b.bucket.replace('T',' ').slice(5));
+  CH.line.data.datasets[0].data       = data.map(b => b.blocked);
+  CH.line.data.datasets[1].data       = data.map(b => b.alerts);
+  CH.line.data.datasets[2].data       = data.map(b => b.allowed);
+  CH.line.update('active');
+}
+
+function renderIpsChart(data) {
+  const pairs = Object.entries(data).slice(0,10);
+  CH.ips.data.labels                  = pairs.map(([ip])  => ip);
+  CH.ips.data.datasets[0].data        = pairs.map(([,cnt]) => cnt);
+  CH.ips.update('active');
+}
+
+function renderModelsChart(data) {
+  const names = Object.keys(data);
+  CH.models.data.labels               = names;
+  CH.models.data.datasets[0].data     = names.map(n => data[n].detections ?? 0);
+  CH.models.update('active');
+
+  CH.mlDetail.data.labels             = names;
+  CH.mlDetail.data.datasets[0].data   = names.map(n => data[n].detections ?? 0);
+  CH.mlDetail.data.datasets[1].data   = names.map(n => data[n].avg_score  ?? 0);
+  CH.mlDetail.update('active');
+}
+
+function renderTable(entries) {
+  if (!DT) return;
+  DT.clear().rows.add(entries).draw();
+}
+
+const ML_META = {
+  SQLi_Expert  : { icon:'🗄️',  color:'#3b82f6', bg:'#eff6ff', label:'SQLi Expert',        type:'Supervised — XGBoost'        },
+  XSS_Expert   : { icon:'⚡',   color:'#f97316', bg:'#fff7ed', label:'XSS Expert',         type:'Supervised — Random Forest'  },
+  Master_Model : { icon:'🎯',   color:'#8b5cf6', bg:'#f5f3ff', label:'Master Model',       type:'Ensemble Voting'             },
+  LOF          : { icon:'🔍',   color:'#06b6d4', bg:'#ecfeff', label:'LOF Anomaly',        type:'Unsupervised — LOF'          },
+};
+
+function renderMLCards(data) {
+  const all = [...new Set([...Object.keys(ML_META), ...Object.keys(data)])];
+  document.getElementById('ml-cards').innerHTML = all.map(name => {
+    const m = ML_META[name] || {icon:'🤖', color:'#64748b', bg:'#f8fafc', label:name, type:'ML Model'};
+    const d = data[name]    || {detections:0, avg_score:0};
+    const pct = Math.round((d.avg_score||0)*100);
+    const bar = pct>=80 ? C.blocked : pct>=50 ? C.alerts : C.blue;
+    const alertsHtml = d.alerts !== undefined
+      ? `<div class="col-6">
+           <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.5px">Alerts</div>
+           <div style="font-size:22px;font-weight:800;color:${C.alerts}">${d.alerts}</div>
+         </div>` : '';
+    return `
+    <div class="col-xl-3 col-md-6">
+      <div class="model-card">
+        <div class="model-ico" style="background:${m.bg};color:${m.color}">${m.icon}</div>
+        <div class="model-name">${esc(m.label)}</div>
+        <div class="model-type">${m.type}</div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.5px">Detections</div>
+            <div style="font-size:22px;font-weight:800;color:${m.color}">${d.detections}</div>
+          </div>
+          ${alertsHtml}
+        </div>
+        <div style="font-size:11px;color:var(--txt-2);margin-bottom:5px">
+          Avg confidence: <strong style="color:${bar}">${pct}%</strong>
+        </div>
+        <div class="progress" style="height:5px;border-radius:3px;background:#e2e8f0">
+          <div class="progress-bar" style="width:${pct}%;background:${bar};border-radius:3px;transition:width .6s ease"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   MAIN UPDATE
+─────────────────────────────────────────────────────────────────── */
+function logsUrl() {
+  const cat = (document.getElementById('cat-filter')?.value || '').trim();
+  let u = '/api/dashboard/logs?page=1&limit=200';
+  if (activeStatus) u += `&log_status=${activeStatus}`;
+  if (cat)          u += `&category=${encodeURIComponent(cat)}`;
+  return u;
+}
+
+async function updateDashboard() {
+  try {
+    const [stats, attacks, tl, ips, mdls, logs] = await Promise.all([
+      get('/api/dashboard/stats'),
+      get('/api/dashboard/attacks-by-type'),
+      get(`/api/dashboard/timeline?interval=${activeInterval}`),
+      get('/api/dashboard/top-ips'),
+      get('/api/dashboard/models-stats'),
+      get(logsUrl()),
+    ]);
+
+    renderKpis(stats);
+    renderPie(attacks);
+    renderLine(tl);
+    renderIpsChart(ips);
+    renderModelsChart(mdls);
+    renderTable(logs.entries || []);
+    renderMLCards(mdls);
+
+    const ts = stats.latest_timestamp ? fmtTs(stats.latest_timestamp)
+                                      : new Date().toLocaleTimeString();
+    document.getElementById('ts-display').textContent = ts;
+  } catch(e) {
+    console.error('Dashboard refresh error:', e);
+    toast('Refresh failed: ' + e.message, 'danger');
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   FILTERS
+─────────────────────────────────────────────────────────────────── */
+async function filterStatus(btn, status) {
+  btn.closest('#status-grp').querySelectorAll('.btn')
+    .forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeStatus = status;
+  await applyLogFilters();
+}
+
+async function applyLogFilters() {
+  try {
+    const d = await get(logsUrl());
+    renderTable(d.entries || []);
+  } catch(e) { toast('Filter failed', 'danger'); }
+}
+
+async function changeInterval(btn, iv) {
+  document.querySelectorAll('.interval-btn')
+    .forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeInterval = iv;
+  try {
+    const d = await get(`/api/dashboard/timeline?interval=${iv}`);
+    renderLine(d);
+  } catch(e) { toast('Timeline error', 'danger'); }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   IP MANAGER
+─────────────────────────────────────────────────────────────────── */
+async function addWhitelist() {
+  const ip = document.getElementById('wl-ip').value.trim();
+  const fb = document.getElementById('wl-fb');
+  if (!ip) { fb.innerHTML = '<span class="text-warning">Enter an IP.</span>'; return; }
+  try {
+    await post('/api/dashboard/whitelist', {ip});
+    fb.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${esc(ip)} whitelisted.</span>`;
+    document.getElementById('wl-ip').value = '';
+    toast(ip + ' added to whitelist');
+  } catch(e) {
+    fb.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${esc(e.message)}</span>`;
+  }
+}
+
+async function addBlacklist() {
+  const ip = document.getElementById('bl-ip').value.trim();
+  const fb = document.getElementById('bl-fb');
+  if (!ip) { fb.innerHTML = '<span class="text-warning">Enter an IP.</span>'; return; }
+  try {
+    await post('/api/dashboard/blacklist', {ip});
+    fb.innerHTML = `<span class="text-danger"><i class="bi bi-check-circle me-1"></i>${esc(ip)} blacklisted.</span>`;
+    document.getElementById('bl-ip').value = '';
+    toast(ip + ' blacklisted', 'danger');
+  } catch(e) {
+    fb.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${esc(e.message)}</span>`;
+  }
+}
+
+async function lookupIp() {
+  const ip  = document.getElementById('lkp-ip').value.trim();
+  const box = document.getElementById('ip-result');
+  if (!ip) return;
+  try {
+    const d = await get(`/api/dashboard/ip-status/${encodeURIComponent(ip)}`);
+    const color = d.is_blocked ? '#ef4444' : d.is_whitelisted ? '#22c55e' : '#64748b';
+    const label = d.is_blocked ? '🚫 BLOCKED'
+                : d.is_whitelisted ? '✅ WHITELISTED' : '✔ Normal';
+    box.style.display = 'block';
+    box.innerHTML = `
+      <div style="font-weight:700;font-size:14px;color:${color};margin-bottom:10px">
+        ${label} — ${esc(d.ip)}
+      </div>
+      <div class="ip-row"><span class="ip-lbl">Reputation score</span><span class="ip-val">${d.score}</span></div>
+      <div class="ip-row"><span class="ip-lbl">Offenses</span><span class="ip-val">${d.offenses}</span></div>
+      <div class="ip-row"><span class="ip-lbl">Whitelisted</span>
+        <span class="ip-val">${d.is_whitelisted ? '<span class="badge bg-success">Yes</span>' : 'No'}</span></div>
+      <div class="ip-row"><span class="ip-lbl">Blacklisted</span>
+        <span class="ip-val">${d.is_blacklisted ? '<span class="badge bg-danger">Yes</span>' : 'No'}</span></div>
+      <div class="ip-row"><span class="ip-lbl">Blocked until</span>
+        <span class="ip-val">${d.blocked_until ? fmtTs(d.blocked_until) : '—'}</span></div>`;
+  } catch(e) {
+    box.style.display = 'block';
+    box.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${esc(e.message)}</span>`;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   NAVIGATION
+─────────────────────────────────────────────────────────────────── */
+const TITLES = {
+  overview  : 'Overview',
+  logs      : 'Event Logs',
+  'ip-manager': 'IP Manager',
+  'ml-models' : 'ML Models',
+};
+
+function showSection(name) {
+  document.querySelectorAll('.section')
+    .forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + name)?.classList.add('active');
+
+  document.querySelectorAll('.sb-link')
+    .forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.sb-link').forEach(l => {
+    if (l.getAttribute('onclick')?.includes("'" + name + "'"))
+      l.classList.add('active');
+  });
+
+  document.getElementById('hdr-title').textContent = TITLES[name] || name;
+
+  // Resize charts that were hidden during their initial render
+  if (name === 'ml-models' && CH.mlDetail)
+    requestAnimationFrame(() => CH.mlDetail.resize());
+  if (name === 'overview')
+    requestAnimationFrame(() => { CH.pie?.resize(); CH.line?.resize(); });
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   REFRESH MANAGEMENT
+─────────────────────────────────────────────────────────────────── */
+function startCountdown() {
+  cdVal = 30;
+  clearInterval(cdTimer);
+  const el = document.getElementById('countdown');
+  if (el) el.textContent = cdVal;
+  cdTimer = setInterval(() => {
+    cdVal--;
+    if (el) el.textContent = Math.max(cdVal, 0);
+    if (cdVal <= 0) clearInterval(cdTimer);
+  }, 1000);
+}
+
+async function manualRefresh() {
+  const btn = document.getElementById('btn-refresh');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Refreshing…';
+  clearInterval(autoTimer);
+  clearInterval(cdTimer);
+  try   { await updateDashboard(); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+    startCountdown();
+    autoTimer = setInterval(async () => { await updateDashboard(); startCountdown(); }, AUTO_MS);
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   INIT
+─────────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', async () => {
+  initCharts();
+  initTable();
+  await updateDashboard();
+  startCountdown();
+  autoTimer = setInterval(async () => { await updateDashboard(); startCountdown(); }, AUTO_MS);
+});
+</script>
+</body>
+</html>

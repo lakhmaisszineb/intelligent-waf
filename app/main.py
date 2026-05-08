@@ -9,11 +9,13 @@ from .rule_engine import analyze_request, block_response
 from app.ml.ml_engine import MLDetectionEngine
 from app.ml.reputation import IPReputationEngine
 from app.ml.feedback import FeedbackCollector
+from app.dashboard.routes import router as dashboard_router
 
 load_dotenv()
 TARGET_URL = os.getenv("TARGET_URL", "http://localhost:9001")
 
 waf = FastAPI()
+waf.include_router(dashboard_router)
 
 ml_engine = MLDetectionEngine()
 ml_engine.load_models()
