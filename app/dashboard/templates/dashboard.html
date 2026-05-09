@@ -3,8 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Intelligent WAF — Security Dashboard</title>
+  <title>ProxiQ — WAF Security Dashboard</title>
 
+  <!-- Google Fonts — Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
@@ -13,10 +17,11 @@
   <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     /* ── Design tokens ─────────────────────────────────────────────── */
     :root {
       --sb-w:       260px;
-      --sb-bg:      #1e293b;
+      --sb-bg:      #1e3a5f;
       --sb-txt:     rgba(255,255,255,.72);
       --sb-txt-hi:  #fff;
       --sb-accent:  #3b82f6;
@@ -30,9 +35,10 @@
 
     /* ── Reset / base ──────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; }
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; caret-color: transparent; }
+    input, textarea, select { caret-color: auto; }
     body {
       margin: 0;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: var(--pg-bg);
       color: var(--txt-1);
       font-size: 14px;
@@ -122,18 +128,6 @@
       font-size: 12px;
       color: var(--sb-txt);
     }
-    .pulse-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #22c55e;
-      flex-shrink: 0;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,.6); }
-      50%      { opacity: .7; box-shadow: 0 0 0 5px rgba(34,197,94,0); }
-    }
-
     /* ── Main ──────────────────────────────────────────────────────── */
     .main { margin-left: var(--sb-w); flex: 1; display: flex; flex-direction: column; }
 
@@ -274,11 +268,10 @@
       height: 100%;
     }
     .model-ico {
-      width: 38px; height: 38px;
-      border-radius: 8px;
+      width: 56px; height: 56px;
+      border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
-      font-size: 17px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     .model-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
     .model-type { font-size: 11px; color: var(--txt-2); margin-bottom: 12px; }
@@ -303,6 +296,55 @@
     /* ── Timeline interval buttons ──────────────────────────────────── */
     .interval-btn { font-size: 11px !important; padding: 2px 9px !important; }
     .interval-btn.active { background: var(--sb-accent) !important; color: #fff !important; border-color: var(--sb-accent) !important; }
+
+    /* ── Log detail modal ───────────────────────────────────────────── */
+    .modal-field {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 12px;
+      height: 100%;
+    }
+    .mf-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--txt-2);
+      margin-bottom: 4px;
+    }
+    .mf-value { font-size: 13px; font-weight: 500; color: var(--txt-1); }
+    #logs-tbl tbody tr { cursor: pointer; }
+    #logs-tbl tbody tr:hover td { background: #f0f4ff !important; }
+
+    /* ── Event Logs table readability ──────────────────────────────── */
+    #logs-tbl td {
+      font-size: 0.875rem;
+      vertical-align: middle;
+      padding: 10px 12px;
+    }
+    #logs-tbl td:nth-child(1),
+    #logs-tbl td:nth-child(2) {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #1e3a5f;
+      letter-spacing: 0.02em;
+    }
+    #logs-tbl th:nth-child(1) { min-width: 160px; }
+    #logs-tbl th:nth-child(2) { min-width: 110px; }
+    #logs-tbl th:nth-child(3) { min-width: 90px;  }
+    #logs-tbl th:nth-child(4) { min-width: 140px; }
+    #logs-tbl thead th {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6c757d;
+      background: #f8f9fa;
+      border-bottom: 2px solid #dee2e6;
+    }
+
   </style>
 </head>
 
@@ -314,10 +356,10 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
   <aside class="sidebar">
     <div class="sb-brand">
-      <span class="sb-brand-icon">🛡️</span>
+      <i class="bi bi-shield-fill sb-brand-icon text-primary"></i>
       <div>
-        <div class="sb-brand-name">Intelligent WAF</div>
-        <div class="sb-brand-sub">Security Dashboard</div>
+        <div class="sb-brand-name">ProxiQ</div>
+        <div class="sb-brand-sub">WAF Security Dashboard</div>
       </div>
     </div>
 
@@ -326,7 +368,7 @@
 
       <div class="sb-item">
         <div class="sb-link active" onclick="showSection('overview')">
-          <i class="bi bi-speedometer2 sb-icon"></i>
+          <i class="bi bi-grid-1x2 sb-icon"></i>
           Overview
         </div>
       </div>
@@ -342,7 +384,7 @@
 
       <div class="sb-item">
         <div class="sb-link" onclick="showSection('ip-manager')">
-          <i class="bi bi-shield-lock sb-icon"></i>
+          <i class="bi bi-shield-check sb-icon"></i>
           IP Manager
         </div>
       </div>
@@ -356,8 +398,8 @@
 
     <div class="sb-footer">
       <div class="waf-status">
-        <div class="pulse-dot"></div>
-        <span>WAF Active</span>
+        <i class="bi bi-activity text-success" style="font-size:14px;flex-shrink:0"></i>
+        <span>ProxiQ Active</span>
         <span class="badge bg-success ms-auto" style="font-size:10px;padding:3px 8px">Online</span>
       </div>
     </div>
@@ -510,31 +552,46 @@
       <!-- ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ -->
       <section class="section" id="section-logs">
         <div class="card-panel">
-          <div class="cp-hdr">
-            <span class="cp-title">
-              <i class="bi bi-list-ul me-1 text-primary"></i>WAF Event Logs
-            </span>
-            <!-- Status filter -->
-            <div class="btn-group btn-group-sm" role="group" id="status-grp">
-              <button class="btn btn-outline-secondary active"
-                      onclick="filterStatus(this, null)">All</button>
-              <button class="btn btn-outline-danger"
-                      onclick="filterStatus(this,'BLOCKED')">Blocked</button>
-              <button class="btn btn-outline-warning"
-                      onclick="filterStatus(this,'ALERT')">Alert</button>
-              <button class="btn btn-outline-success"
-                      onclick="filterStatus(this,'ALLOWED')">Allowed</button>
+          <div class="cp-hdr" style="gap:8px">
+            <!-- Live search -->
+            <input type="text" id="logs-search" class="form-control form-control-sm"
+                   placeholder="Search logs…" style="flex:1;min-width:160px;max-width:320px"
+                   oninput="DT && DT.search(this.value).draw()">
+            <!-- Filters dropdown -->
+            <div class="dropdown">
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1"
+                      type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-funnel"></i>Filters
+              </button>
+              <div class="dropdown-menu p-3" style="min-width:260px" onclick="event.stopPropagation()">
+                <label class="form-label mb-1" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Attack Category</label>
+                <select class="form-select form-select-sm mb-3" id="cat-filter" onchange="applyLogFilters()">
+                  <option value="">All categories</option>
+                  <option value="sql_injection">SQL Injection</option>
+                  <option value="xss">XSS</option>
+                  <option value="lfi">LFI / Path Traversal</option>
+                  <option value="rce">RCE / CMDi</option>
+                  <option value="php_injection">PHP Injection</option>
+                </select>
+                <label class="form-label mb-1" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Status</label>
+                <div class="btn-group btn-group-sm w-100" role="group" id="status-grp">
+                  <button class="btn btn-outline-secondary active" onclick="filterStatus(this,null)">All</button>
+                  <button class="btn btn-outline-danger"   onclick="filterStatus(this,'BLOCKED')">Blocked</button>
+                  <button class="btn btn-outline-warning"  onclick="filterStatus(this,'ALERT')">Alert</button>
+                  <button class="btn btn-outline-success"  onclick="filterStatus(this,'ALLOWED')">Allowed</button>
+                </div>
+              </div>
             </div>
-            <!-- Category filter -->
-            <select class="form-select form-select-sm" style="width:155px"
-                    id="cat-filter" onchange="applyLogFilters()">
-              <option value="">All categories</option>
-              <option value="sql_injection">SQL Injection</option>
-              <option value="xss">XSS</option>
-              <option value="lfi">LFI</option>
-              <option value="rce">RCE</option>
-              <option value="php_injection">PHP Injection</option>
-            </select>
+            <!-- Rows per page -->
+            <input type="number" id="rows-per-page" class="form-control form-control-sm text-center"
+                   value="25" min="1" max="500" style="width:64px"
+                   title="Rows per page"
+                   onchange="if(DT){DT.page.len(Math.max(1,+this.value||25)).draw();}">
+            <!-- Export CSV -->
+            <button class="btn btn-sm btn-success d-flex align-items-center gap-1"
+                    id="btn-export-csv" onclick="exportCsv()">
+              <i class="bi bi-file-earmark-excel"></i>Export CSV
+            </button>
           </div>
           <div class="cp-body p-0 px-3 pb-3">
             <table id="logs-tbl" class="table table-hover table-sm w-100">
@@ -660,6 +717,31 @@
   </main>
 </div><!-- /app -->
 
+<!-- ── LOG DETAIL MODAL ──────────────────────────────────────────── -->
+<div class="modal fade" id="log-modal" tabindex="-1" aria-labelledby="log-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" id="modal-hdr">
+        <div>
+          <h5 class="modal-title mb-0" id="log-modal-title" style="font-size:15px;font-weight:700">
+            <i class="bi bi-info-circle me-2 text-primary"></i>Event Detail
+          </h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="modal-body" style="padding:16px">
+        <!-- Filled by openLogModal() -->
+      </div>
+      <div class="modal-footer" style="padding:10px 16px">
+        <button class="btn btn-sm btn-danger" id="modal-block-btn" onclick="blockIpFromModal()">
+          <i class="bi bi-ban me-1"></i>Block this IP
+        </button>
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div class="position-fixed top-0 end-0 p-3" style="z-index:9999">
   <div id="toasts"></div>
@@ -700,6 +782,21 @@ const C = {
   cats    : ['#3b82f6','#ef4444','#f97316','#22c55e',
              '#8b5cf6','#06b6d4','#ec4899','#eab308','#14b8a6','#f43f5e'],
 };
+
+
+/* ───────────────────────────────────────────────────────────────────
+   ATTACK TYPE LABELS  (used in chart and table)
+─────────────────────────────────────────────────────────────────── */
+const ATTACK_LABELS = {
+  sql_injection : 'SQL Injection',
+  xss           : 'XSS',
+  rce           : 'RCE / CMDi',
+  lfi           : 'LFI / Path Traversal',
+  php_injection : 'PHP Injection',
+  ml_attack     : 'ML Detection',
+  other         : 'Other',
+};
+function attackLabel(k) { return ATTACK_LABELS[k] || k || '—'; }
 
 /* ───────────────────────────────────────────────────────────────────
    UTILITIES
@@ -763,6 +860,7 @@ async function post(url, body) {
   return r.json();
 }
 
+
 /* ───────────────────────────────────────────────────────────────────
    CHART INIT  (called once at DOMContentLoaded)
 ─────────────────────────────────────────────────────────────────── */
@@ -774,11 +872,10 @@ function initCharts() {
             borderWidth:2, borderColor:'#fff', hoverOffset:6}] },
     options: {
       responsive:true, maintainAspectRatio:false,
+      animation: false,
       plugins: {
         legend:{ position:'right', labels:{ boxWidth:11, font:{size:11}, padding:10 } },
-        tooltip:{ callbacks:{
-          label: ctx => ` ${ctx.label}: ${ctx.parsed} events`
-        }}
+        tooltip:{ callbacks:{ label: ctx => ` ${ctx.label}: ${ctx.parsed} events` }},
       }
     }
   });
@@ -796,6 +893,7 @@ function initCharts() {
     },
     options: {
       responsive:true, maintainAspectRatio:false,
+      animation: false,
       plugins:{ legend:{ labels:{ boxWidth:11, font:{size:11} } } },
       scales:{
         x:{ ticks:{ font:{size:10}, maxTicksLimit:14, maxRotation:0 } },
@@ -814,6 +912,7 @@ function initCharts() {
     options: {
       indexAxis:'y',
       responsive:true, maintainAspectRatio:false,
+      animation: false,
       plugins:{ legend:{display:false} },
       scales:{
         x:{ beginAtZero:true, ticks:{font:{size:10}} },
@@ -831,6 +930,7 @@ function initCharts() {
     }] },
     options: {
       responsive:true, maintainAspectRatio:false,
+      animation: false,
       plugins:{ legend:{display:false} },
       scales:{
         x:{ ticks:{font:{size:11}} },
@@ -839,7 +939,7 @@ function initCharts() {
     }
   });
 
-  // Dual-axis bar — ML Models section detail
+  // Dual-axis bar+line — ML Models detail
   CH.mlDetail = new Chart(document.getElementById('ch-ml-detail'), {
     type: 'bar',
     data: {
@@ -852,6 +952,7 @@ function initCharts() {
     },
     options: {
       responsive:true, maintainAspectRatio:false,
+      animation: false,
       plugins:{ legend:{ labels:{ boxWidth:11, font:{size:11} } } },
       scales:{
         y:  { beginAtZero:true, ticks:{font:{size:10}},
@@ -877,7 +978,7 @@ function initTable() {
       { data:'method',    render: d => `<span class="badge bg-light text-dark border" style="font-size:10px">${esc(d)}</span>` },
       { data:'path',      render: d => `<span style="font-size:11px;max-width:180px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d)}</span>` },
       { data:'status',    render: statusBadge },
-      { data:'category',  render: d => d ? `<span class="badge bg-light text-dark border" style="font-size:10px">${esc(d)}</span>` : '—' },
+      { data:'category',  render: d => d ? `<span class="badge bg-light text-dark border" style="font-size:10px">${esc(attackLabel(d))}</span>` : '—' },
       { data:'model',     render: d => d ? `<span style="color:#8b5cf6;font-size:11px">${esc(d)}</span>` : '—' },
       { data:'score',     render: scoreCell },
       { data:'payload',   render: d => d
@@ -885,15 +986,21 @@ function initTable() {
           : '<span class="text-muted">—</span>' },
     ],
     pageLength: 25,
-    lengthMenu: [10, 25, 50, 100],
     order: [[0,'desc']],
+    columnDefs: [{ visible: false, targets: [2, 3, 6, 7, 8] }],
     language: {
-      search: 'Search:',
-      lengthMenu: 'Show _MENU_ rows',
       info: 'Showing _START_–_END_ of _TOTAL_ events',
       emptyTable: 'No events found.',
+      search: '_INPUT_',
+      searchPlaceholder: '',
     },
-    dom: '<"d-flex align-items-center justify-content-between mb-2"<"me-2"l>f>rtip',
+    dom: 'rtip',
+  });
+
+  // Open detail modal on row click
+  $('#logs-tbl tbody').on('click', 'tr', function() {
+    const row = DT.row(this).data();
+    if (row) openLogModal(row);
   });
 }
 
@@ -912,36 +1019,36 @@ function renderKpis(s) {
 }
 
 function renderPie(data) {
-  CH.pie.data.labels                  = Object.keys(data);
-  CH.pie.data.datasets[0].data        = Object.values(data);
-  CH.pie.update('active');
+  CH.pie.data.labels           = Object.keys(data).map(attackLabel);
+  CH.pie.data.datasets[0].data = Object.values(data);
+  CH.pie.update('none');
 }
 
 function renderLine(data) {
-  CH.line.data.labels                 = data.map(b => b.bucket.replace('T',' ').slice(5));
-  CH.line.data.datasets[0].data       = data.map(b => b.blocked);
-  CH.line.data.datasets[1].data       = data.map(b => b.alerts);
-  CH.line.data.datasets[2].data       = data.map(b => b.allowed);
-  CH.line.update('active');
+  CH.line.data.labels               = data.map(b => b.bucket.replace('T',' ').slice(5));
+  CH.line.data.datasets[0].data     = data.map(b => b.blocked);
+  CH.line.data.datasets[1].data     = data.map(b => b.alerts);
+  CH.line.data.datasets[2].data     = data.map(b => b.allowed);
+  CH.line.update('none');
 }
 
 function renderIpsChart(data) {
-  const pairs = Object.entries(data).slice(0,10);
-  CH.ips.data.labels                  = pairs.map(([ip])  => ip);
-  CH.ips.data.datasets[0].data        = pairs.map(([,cnt]) => cnt);
-  CH.ips.update('active');
+  const pairs = Object.entries(data).slice(0, 10);
+  CH.ips.data.labels               = pairs.map(([ip])    => ip);
+  CH.ips.data.datasets[0].data     = pairs.map(([, cnt]) => cnt);
+  CH.ips.update('none');
 }
 
 function renderModelsChart(data) {
   const names = Object.keys(data);
-  CH.models.data.labels               = names;
-  CH.models.data.datasets[0].data     = names.map(n => data[n].detections ?? 0);
-  CH.models.update('active');
+  CH.models.data.labels             = names;
+  CH.models.data.datasets[0].data   = names.map(n => data[n].detections ?? 0);
+  CH.models.update('none');
 
-  CH.mlDetail.data.labels             = names;
-  CH.mlDetail.data.datasets[0].data   = names.map(n => data[n].detections ?? 0);
-  CH.mlDetail.data.datasets[1].data   = names.map(n => data[n].avg_score  ?? 0);
-  CH.mlDetail.update('active');
+  CH.mlDetail.data.labels           = names;
+  CH.mlDetail.data.datasets[0].data = names.map(n => data[n].detections ?? 0);
+  CH.mlDetail.data.datasets[1].data = names.map(n => data[n].avg_score   ?? 0);
+  CH.mlDetail.update('none');
 }
 
 function renderTable(entries) {
@@ -950,10 +1057,10 @@ function renderTable(entries) {
 }
 
 const ML_META = {
-  SQLi_Expert  : { icon:'🗄️',  color:'#3b82f6', bg:'#eff6ff', label:'SQLi Expert',        type:'Supervised — XGBoost'        },
-  XSS_Expert   : { icon:'⚡',   color:'#f97316', bg:'#fff7ed', label:'XSS Expert',         type:'Supervised — Random Forest'  },
-  Master_Model : { icon:'🎯',   color:'#8b5cf6', bg:'#f5f3ff', label:'Master Model',       type:'Ensemble Voting'             },
-  LOF          : { icon:'🔍',   color:'#06b6d4', bg:'#ecfeff', label:'LOF Anomaly',        type:'Unsupervised — LOF'          },
+  SQLi_Expert  : { icon:'bi-database-fill-exclamation', color:'#0d6efd', bg:'#eff6ff', label:'SQLi Expert',   type:'Supervised — XGBoost'       },
+  XSS_Expert   : { icon:'bi-code-slash',                color:'#fd7e14', bg:'#fff7ed', label:'XSS Expert',    type:'Supervised — Random Forest'  },
+  Master_Model : { icon:'bi-diagram-3-fill',            color:'#6f42c1', bg:'#f5f3ff', label:'Master Model',  type:'Ensemble Voting'             },
+  LOF          : { icon:'bi-search',                    color:'#0dcaf0', bg:'#ecfeff', label:'LOF Anomaly',   type:'Unsupervised — LOF'          },
 };
 
 function renderMLCards(data) {
@@ -971,7 +1078,9 @@ function renderMLCards(data) {
     return `
     <div class="col-xl-3 col-md-6">
       <div class="model-card">
-        <div class="model-ico" style="background:${m.bg};color:${m.color}">${m.icon}</div>
+        <div class="model-ico" style="background:${m.bg}">
+          <i class="bi ${m.icon}" style="font-size:2rem;color:${m.color}"></i>
+        </div>
         <div class="model-name">${esc(m.label)}</div>
         <div class="model-type">${m.type}</div>
         <div class="row g-2 mb-3">
@@ -990,6 +1099,176 @@ function renderMLCards(data) {
       </div>
     </div>`;
   }).join('');
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   LOG DETAIL MODAL
+─────────────────────────────────────────────────────────────────── */
+let _modalIp = null;
+
+function openLogModal(row) {
+  _modalIp = row.ip;
+
+  const scMap = {BLOCKED:'danger', ALERT:'warning', ALLOWED:'success'};
+  const sc  = scMap[row.status] || 'secondary';
+  const pct = row.score ? Math.round(row.score * 100) : 0;
+  const barCls = pct >= 80 ? 'bg-danger' : pct >= 50 ? 'bg-warning' : 'bg-secondary';
+
+  // Colour the modal header strip to match the event severity
+  document.getElementById('modal-hdr').className =
+    `modal-header border-bottom border-${sc} border-2`;
+
+  document.getElementById('modal-body').innerHTML = `
+  <div class="row g-2">
+    <div class="col-sm-6">
+      <div class="modal-field">
+        <div class="mf-label">Timestamp</div>
+        <div class="mf-value">${esc(fmtTs(row.timestamp))}</div>
+      </div>
+    </div>
+    <div class="col-sm-6">
+      <div class="modal-field">
+        <div class="mf-label">Status</div>
+        <div class="mf-value">${statusBadge(row.status)}</div>
+      </div>
+    </div>
+    <div class="col-sm-6">
+      <div class="modal-field">
+        <div class="mf-label">IP Address</div>
+        <div class="mf-value"><code style="font-size:13px">${esc(row.ip)}</code></div>
+      </div>
+    </div>
+    <div class="col-sm-3">
+      <div class="modal-field">
+        <div class="mf-label">Method</div>
+        <div class="mf-value">
+          <span class="badge bg-light text-dark border">${esc(row.method)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-3">
+      <div class="modal-field">
+        <div class="mf-label">Category</div>
+        <div class="mf-value">
+          ${row.category
+            ? `<span class="badge bg-light text-dark border">${esc(attackLabel(row.category))}</span>`
+            : '—'}
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="modal-field">
+        <div class="mf-label">Path</div>
+        <div class="mf-value">
+          <code style="word-break:break-all;font-size:12px">${esc(row.path)}</code>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6">
+      <div class="modal-field">
+        <div class="mf-label">ML Model</div>
+        <div class="mf-value">
+          ${row.model
+            ? `<span style="color:#8b5cf6;font-weight:600">${esc(row.model)}</span>`
+            : '<span class="text-muted">—</span>'}
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6">
+      <div class="modal-field">
+        <div class="mf-label">Confidence Score</div>
+        <div class="mf-value">
+          ${pct > 0 ? `
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height:8px;border-radius:4px;background:#e2e8f0">
+                <div class="progress-bar ${barCls}"
+                     style="width:${pct}%;border-radius:4px;transition:width .5s ease"></div>
+              </div>
+              <span class="fw-bold" style="min-width:36px;font-size:13px">${pct}%</span>
+            </div>` : '<span class="text-muted">—</span>'}
+        </div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="modal-field">
+        <div class="mf-label">Reason / Detection</div>
+        <div class="mf-value">${esc(row.reason) || '<span class="text-muted">—</span>'}</div>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="modal-field">
+        <div class="mf-label">Payload <span style="font-weight:400;color:var(--txt-2)">(full)</span></div>
+        <div class="mf-value">
+          ${row.payload
+            ? `<code style="display:block;background:#fef2f2;color:#dc2626;padding:10px 12px;
+                      border-radius:6px;font-size:12px;word-break:break-all;
+                      white-space:pre-wrap;max-height:160px;overflow-y:auto">${esc(row.payload)}</code>`
+            : '<span class="text-muted">—</span>'}
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  new bootstrap.Modal(document.getElementById('log-modal')).show();
+}
+
+async function blockIpFromModal() {
+  if (!_modalIp) return;
+  const btn = document.getElementById('modal-block-btn');
+  btn.disabled = true;
+  try {
+    await post('/api/dashboard/blacklist', {ip: _modalIp});
+    toast(_modalIp + ' blocked', 'danger');
+    bootstrap.Modal.getInstance(document.getElementById('log-modal'))?.hide();
+  } catch(e) {
+    toast('Block failed: ' + e.message, 'danger');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   EXPORT CSV
+─────────────────────────────────────────────────────────────────── */
+async function exportCsv() {
+  const btn = document.getElementById('btn-export-csv');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" style="border-top-color:#2563eb;border-color:#c7d2fe"></span> Exporting…'; }
+  try {
+    const cat = (document.getElementById('cat-filter')?.value || '').trim();
+    let url = '/api/dashboard/logs?page=1&limit=10000';
+    if (activeStatus) url += `&log_status=${activeStatus}`;
+    if (cat)          url += `&category=${encodeURIComponent(cat)}`;
+
+    const data    = await get(url);
+    const entries = data.entries || [];
+
+    const COLS = ['Timestamp','IP','Method','Path','Status','Category','Model','Score','Payload'];
+    const rows = entries.map(e => [
+      fmtTs(e.timestamp),
+      e.ip       || '',
+      e.method   || '',
+      e.path     || '',
+      e.status   || '',
+      e.category ? attackLabel(e.category) : '',
+      e.model    || '',
+      e.score    ? (e.score * 100).toFixed(1) + '%' : '',
+      e.payload  || '',
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+
+    const csv   = [COLS.join(','), ...rows].join('\r\n');
+    const blob  = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
+    const href  = URL.createObjectURL(blob);
+    const a     = Object.assign(document.createElement('a'), {
+      href, download: `waf_logs_${new Date().toISOString().slice(0,10)}.csv`
+    });
+    a.click();
+    URL.revokeObjectURL(href);
+    toast(`Exported ${entries.length} events`, 'success');
+  } catch(e) {
+    toast('Export failed: ' + e.message, 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-download me-1"></i>Export CSV'; }
+  }
 }
 
 /* ───────────────────────────────────────────────────────────────────
@@ -1143,7 +1422,7 @@ function showSection(name) {
 
   document.getElementById('hdr-title').textContent = TITLES[name] || name;
 
-  // Resize charts that were hidden during their initial render
+  // Chart.js ne se redimensionne pas quand il est dans une section cachée
   if (name === 'ml-models' && CH.mlDetail)
     requestAnimationFrame(() => CH.mlDetail.resize());
   if (name === 'overview')
