@@ -33,6 +33,7 @@ from app.dashboard.log_parser import (
     get_timeline,
     iter_entries,
 )
+from app.ml.feedback import FeedbackCollector
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +104,46 @@ class IPRequest(BaseModel):
     @field_validator("ip")
     @classmethod
     def _validate_ip(cls, v: str) -> str:
+        try:
+            ipaddress.ip_address(v)
+        except ValueError:
+            raise ValueError(f"'{v}' is not a valid IP address")
+        return v
+
+
+class FeedbackRequest(BaseModel):
+    id: str
+    validation: str
+
+    @field_validator("validation")
+    @classmethod
+    def _validate_validation(cls, v: str) -> str:
+        if v not in ("TP", "FP", "TN", "FN"):
+            raise ValueError("validation must be 'TP', 'FP', 'TN', or 'FN'")
+        return v
+
+
+class DirectFeedbackRequest(BaseModel):
+    request_str:     str   = ""
+    original_status: str
+    validation:      str
+    ip:              str
+    path:            str   = ""
+    payload:         str   = ""
+    model:           str   = ""
+    attack_type:     str   = ""
+    score:           float = 0.0
+
+    @field_validator("validation")
+    @classmethod
+    def _val_validation(cls, v: str) -> str:
+        if v not in ("TP", "FP", "TN", "FN"):
+            raise ValueError("validation must be TP, FP, TN, or FN")
+        return v
+
+    @field_validator("ip")
+    @classmethod
+    def _val_ip(cls, v: str) -> str:
         try:
             ipaddress.ip_address(v)
         except ValueError:
@@ -411,6 +452,91 @@ async def ip_status(ip: str):
         "offenses":       engine.get_offenses(ip),
         "blocked_until":  blocked_until.isoformat() if blocked_until else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# POST /api/dashboard/feedback
+# ---------------------------------------------------------------------------
+
+@api_router.post("/feedback", status_code=status.HTTP_200_OK)
+async def post_feedback(body: FeedbackRequest):
+    """Record an admin validation (TP/FP/TN/FN) for a logged decision."""
+    print(f"[FEEDBACK] id={body.id!r}  validation={body.validation!r}")
+    found = FeedbackCollector().validate_decision(body.id, body.validation)
+    print(f"[FEEDBACK] found={found}")
+    if not found:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Entrée id={body.id!r} introuvable dans feedback.jsonl",
+        )
+    return {"success": True, "message": "Feedback enregistré"}
+
+
+# ---------------------------------------------------------------------------
+# GET /api/dashboard/feedback/stats
+# ---------------------------------------------------------------------------
+
+@api_router.get("/feedback/stats")
+async def feedback_stats():
+    """Aggregate TP/FP/TN/FN counters from the feedback log."""
+    return FeedbackCollector().get_statistics()
+
+
+# ---------------------------------------------------------------------------
+# POST /api/dashboard/feedback/direct
+# ---------------------------------------------------------------------------
+
+@api_router.post("/feedback/direct", status_code=status.HTTP_200_OK)
+async def direct_feedback(body: DirectFeedbackRequest):
+    """
+    Create a new feedback.jsonl entry from a waf.log event and validate it
+    immediately — bypasses the timestamp-matching problem between the two
+    log files by writing a fresh entry with a known UUID.
+    """
+    prediction  = body.original_status == "BLOCKED"
+    request_str = body.payload or body.request_str or body.path or ""
+
+    print(
+        f"[DIRECT FEEDBACK] ip={body.ip!r}  status={body.original_status!r}"
+        f"  validation={body.validation!r}  model={body.model!r}"
+    )
+
+    entry_id = FeedbackCollector().log_and_validate(
+        request_str = request_str,
+        prediction  = prediction,
+        score       = body.score,
+        zone        = "dashboard",
+        model       = body.model,
+        attack_type = body.attack_type,
+        client_ip   = body.ip,
+        validation  = body.validation,
+    )
+    print(f"[DIRECT FEEDBACK] created entry_id={entry_id!r}")
+    return {"success": True, "message": "Feedback enregistré"}
+
+
+# ---------------------------------------------------------------------------
+# GET /api/dashboard/feedback/corrections
+# ---------------------------------------------------------------------------
+
+@api_router.get("/feedback/corrections")
+async def feedback_corrections(validation_type: Optional[str] = None):
+    """
+    All decisions that have received an admin validation.
+
+    Query parameters
+    ----------------
+    validation_type : optional filter — TP | FP | TN | FN
+    """
+    if validation_type and validation_type not in ("TP", "FP", "TN", "FN"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="validation_type must be TP, FP, TN, or FN",
+        )
+    data = FeedbackCollector().get_labeled_data()
+    if validation_type:
+        data = [e for e in data if e.get("admin_validation") == validation_type]
+    return data
 
 
 # ---------------------------------------------------------------------------

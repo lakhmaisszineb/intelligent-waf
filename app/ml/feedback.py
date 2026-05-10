@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from datetime import datetime
 
 class FeedbackCollector:
@@ -18,15 +19,16 @@ class FeedbackCollector:
     def log_decision(self, request_str, prediction, score, zone, model, attack_type, client_ip):
         """Enregistre chaque décision ML dans le fichier feedback"""
         entry = {
+            'id': str(uuid.uuid4()),
             'timestamp': datetime.now().isoformat(),
             'client_ip': client_ip,
-            'request': request_str[:500],  # Tronquer pour éviter fichiers trop gros
-            'prediction': prediction,       # True=bloqué, False=autorisé
+            'request': request_str[:500],
+            'prediction': prediction,
             'score': score,
             'zone': zone,
             'model': model,
             'attack_type': attack_type,
-            'admin_validation': None,       # Sera rempli plus tard par l'admin
+            'admin_validation': None,
             'validation_date': None
         }
         
@@ -49,25 +51,57 @@ class FeedbackCollector:
             pass
         return entries
     
-    def validate_decision(self, timestamp, validation):
+    def validate_decision(self, entry_id: str, validation: str) -> bool:
         """
-        Valide une décision (appelé depuis le dashboard)
-        validation : 'TP' (True Positive), 'FP' (False Positive), 
-                     'TN' (True Negative), 'FN' (False Negative)
+        Valide une décision (appelé depuis le dashboard) — match par UUID.
+        validation : 'TP' | 'FP' | 'TN' | 'FN'
+        Retourne True si l'entrée a été trouvée et mise à jour.
         """
         entries = []
-        with open(self.feedback_path, 'r') as f:
-            for line in f:
-                if line.strip():
-                    entry = json.loads(line)
-                    if entry['timestamp'] == timestamp:
-                        entry['admin_validation'] = validation
-                        entry['validation_date'] = datetime.now().isoformat()
-                    entries.append(entry)
-        
-        with open(self.feedback_path, 'w') as f:
-            for entry in entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        found = False
+        try:
+            with open(self.feedback_path, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        entry = json.loads(line)
+                        if entry.get('id') == entry_id:
+                            entry['admin_validation'] = validation
+                            entry['validation_date'] = datetime.now().isoformat()
+                            found = True
+                        entries.append(entry)
+        except FileNotFoundError:
+            return False
+
+        if found:
+            with open(self.feedback_path, 'w') as f:
+                for entry in entries:
+                    f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        return found
+
+    def log_and_validate(self, request_str, prediction, score, zone,
+                          model, attack_type, client_ip, validation) -> str:
+        """
+        Crée une nouvelle entrée et la valide immédiatement.
+        Utilisé par le feedback direct depuis le dashboard (waf.log → feedback.jsonl).
+        Retourne l'UUID de l'entrée créée.
+        """
+        now = datetime.now().isoformat()
+        entry = {
+            'id':               str(uuid.uuid4()),
+            'timestamp':        now,
+            'client_ip':        client_ip,
+            'request':          request_str[:500],
+            'prediction':       prediction,
+            'score':            score,
+            'zone':             zone,
+            'model':            model,
+            'attack_type':      attack_type,
+            'admin_validation': validation,
+            'validation_date':  now,
+        }
+        with open(self.feedback_path, 'a') as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        return entry['id']
     
     def get_labeled_data(self):
         """Récupère toutes les données validées pour réentraînement"""

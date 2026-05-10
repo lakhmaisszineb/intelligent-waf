@@ -21,10 +21,10 @@
     /* ── Design tokens ─────────────────────────────────────────────── */
     :root {
       --sb-w:       260px;
-      --sb-bg:      #1e3a5f;
-      --sb-txt:     rgba(255,255,255,.72);
-      --sb-txt-hi:  #fff;
-      --sb-accent:  #3b82f6;
+      --sb-bg:      #f8f9fa;
+      --sb-txt:     #2d3748;
+      --sb-txt-hi:  #1e3a5f;
+      --sb-accent:  #1e3a5f;
       --pg-bg:      #f1f5f9;
       --card-bg:    #fff;
       --border:     #e2e8f0;
@@ -49,6 +49,7 @@
     .sidebar {
       width: var(--sb-w);
       background: var(--sb-bg);
+      border-right: 1px solid #e2e8f0;
       position: fixed;
       top: 0; left: 0;
       height: 100vh;
@@ -60,7 +61,7 @@
 
     .sb-brand {
       padding: 18px 22px;
-      border-bottom: 1px solid rgba(255,255,255,.08);
+      border-bottom: 1px solid #e2e8f0;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -70,12 +71,12 @@
     .sb-brand-name {
       font-size: 15px;
       font-weight: 700;
-      color: var(--sb-txt-hi);
+      color: #1e3a5f;
       line-height: 1.2;
     }
     .sb-brand-sub {
       font-size: 10px;
-      color: var(--sb-txt);
+      color: #64748b;
       text-transform: uppercase;
       letter-spacing: .6px;
     }
@@ -86,7 +87,7 @@
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1px;
-      color: rgba(255,255,255,.3);
+      color: #94a3b8;
       padding: 10px 22px 4px;
     }
     .sb-item { margin: 1px 10px; }
@@ -104,29 +105,29 @@
       transition: background .12s, color .12s;
       user-select: none;
     }
-    .sb-link:hover { background: rgba(255,255,255,.07); color: var(--sb-txt-hi); }
-    .sb-link.active { background: rgba(59,130,246,.22); color: var(--sb-txt-hi); }
-    .sb-link.active .sb-icon { color: var(--sb-accent); }
+    .sb-link:hover { background: #edf2f7; color: #1e3a5f; }
+    .sb-link.active { background: #e2e8f0; color: #1e3a5f; }
+    .sb-link.active .sb-icon { color: #1e3a5f; }
     .sb-icon { font-size: 15px; width: 17px; flex-shrink: 0; }
     .sb-badge {
       margin-left: auto;
       font-size: 10px;
       padding: 2px 7px;
       border-radius: 20px;
-      background: rgba(59,130,246,.35);
-      color: #fff;
+      background: rgba(30,58,95,.12);
+      color: #1e3a5f;
     }
 
     .sb-footer {
       padding: 14px 22px;
-      border-top: 1px solid rgba(255,255,255,.08);
+      border-top: 1px solid #e2e8f0;
     }
     .waf-status {
       display: flex;
       align-items: center;
       gap: 8px;
       font-size: 12px;
-      color: var(--sb-txt);
+      color: #2d3748;
     }
     /* ── Main ──────────────────────────────────────────────────────── */
     .main { margin-left: var(--sb-w); flex: 1; display: flex; flex-direction: column; }
@@ -344,6 +345,17 @@
       background: #f8f9fa;
       border-bottom: 2px solid #dee2e6;
     }
+    #corr-tbl thead th {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6c757d;
+      background: #f8f9fa;
+      border-bottom: 2px solid #dee2e6;
+      white-space: nowrap;
+    }
+    #corr-tbl td { vertical-align: middle; padding: 9px 12px; }
 
   </style>
 </head>
@@ -394,13 +406,23 @@
           ML Models
         </div>
       </div>
+
+      <div class="sb-section" style="margin-top:6px">Feedback</div>
+
+      <div class="sb-item">
+        <div class="sb-link" onclick="showSection('corrections')">
+          <i class="bi bi-flag-fill sb-icon"></i>
+          Corrections
+          <span class="sb-badge" id="corrections-badge">0</span>
+        </div>
+      </div>
     </nav>
 
     <div class="sb-footer">
       <div class="waf-status">
         <i class="bi bi-activity text-success" style="font-size:14px;flex-shrink:0"></i>
         <span>ProxiQ Active</span>
-        <span class="badge bg-success ms-auto" style="font-size:10px;padding:3px 8px">Online</span>
+        <span class="badge ms-auto" style="font-size:10px;padding:3px 8px;background:#dcfce7;color:#166534">Online</span>
       </div>
     </div>
   </aside>
@@ -713,6 +735,79 @@
         </div>
       </section>
 
+      <!-- ── CORRECTIONS ───────────────────────────────────────────── -->
+      <section class="section" id="section-corrections">
+
+        <!-- Stats cards -->
+        <div class="row g-3 mb-4">
+          <div class="col-6 col-md-3">
+            <div class="card-panel text-center py-3">
+              <div style="font-size:24px;font-weight:700;color:#16a34a" id="corr-tp">—</div>
+              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Vrais Positifs</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="card-panel text-center py-3">
+              <div style="font-size:24px;font-weight:700;color:#dc2626" id="corr-fp">—</div>
+              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Faux Positifs</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="card-panel text-center py-3">
+              <div style="font-size:24px;font-weight:700;color:#1d4ed8" id="corr-tn">—</div>
+              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Vrais Négatifs</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="card-panel text-center py-3">
+              <div style="font-size:24px;font-weight:700;color:#ea580c" id="corr-fn">—</div>
+              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Faux Négatifs</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table card -->
+        <div class="card-panel">
+          <div class="cp-hdr" style="gap:8px;flex-wrap:wrap">
+            <span class="cp-title">
+              <i class="bi bi-flag-fill me-1" style="color:#f59e0b"></i>
+              Corrections Admin
+            </span>
+            <div class="btn-group ms-2" id="corr-filter-btns">
+              <button class="btn btn-sm btn-outline-secondary active" onclick="filterCorrections(null, this)">Tout</button>
+              <button class="btn btn-sm btn-outline-success"          onclick="filterCorrections('TP', this)">TP</button>
+              <button class="btn btn-sm btn-outline-danger"           onclick="filterCorrections('FP', this)">FP</button>
+              <button class="btn btn-sm btn-outline-primary"          onclick="filterCorrections('TN', this)">TN</button>
+              <button class="btn btn-sm btn-outline-warning"          onclick="filterCorrections('FN', this)">FN</button>
+            </div>
+            <button class="btn btn-sm btn-success d-flex align-items-center gap-1 ms-auto" onclick="exportCorrectionsCsv()">
+              <i class="bi bi-file-earmark-excel"></i>Export CSV
+            </button>
+          </div>
+          <div class="cp-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm table-hover mb-0" id="corr-tbl">
+                <thead>
+                  <tr>
+                    <th style="min-width:150px">Timestamp</th>
+                    <th style="min-width:110px">IP</th>
+                    <th style="min-width:90px">Statut original</th>
+                    <th style="min-width:90px">Validation admin</th>
+                    <th style="min-width:110px">Modèle</th>
+                    <th style="min-width:90px">Type attaque</th>
+                    <th style="min-width:200px">Payload</th>
+                    <th style="min-width:140px">Date validation</th>
+                  </tr>
+                </thead>
+                <tbody id="corr-tbody">
+                  <tr><td colspan="8" class="text-center text-muted py-4">Chargement…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div><!-- /content -->
   </main>
 </div><!-- /app -->
@@ -736,7 +831,29 @@
         <button class="btn btn-sm btn-danger" id="modal-block-btn" onclick="blockIpFromModal()">
           <i class="bi bi-ban me-1"></i>Block this IP
         </button>
+        <button class="btn btn-sm btn-warning" id="feedback-btn" onclick="openFeedbackModal()">
+          <i class="bi bi-flag me-1"></i>Feedback
+        </button>
         <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FEEDBACK MODAL ─────────────────────────────────────────────── -->
+<div class="modal fade" id="feedback-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
+    <div class="modal-content">
+      <div class="modal-header" style="padding:14px 18px">
+        <h5 class="modal-title mb-0" style="font-size:15px;font-weight:700">
+          <i class="bi bi-flag me-2 text-warning"></i>Corriger cette décision
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:18px">
+        <div id="feedback-modal-body">
+          <!-- Rendered dynamically by renderFeedbackModal() -->
+        </div>
       </div>
     </div>
   </div>
@@ -823,13 +940,15 @@ function scoreCell(v) {
   return `<span class="badge bg-${cls} ${txt}" style="font-size:10px">${p}%</span>`;
 }
 
-function toast(msg, type='success') {
+function toast(msg, type='success', html=false) {
   const id  = 'toast-' + Date.now();
-  const bg  = type==='success'?'bg-success':type==='danger'?'bg-danger':'bg-info';
+  const BG  = {success:'bg-success', danger:'bg-danger', warning:'bg-warning', info:'bg-info'};
+  const bg  = BG[type] || 'bg-info';
+  const body = html ? msg : esc(msg);
   document.getElementById('toasts').insertAdjacentHTML('beforeend',
     `<div id="${id}" class="toast align-items-center text-white ${bg} border-0" role="alert">
        <div class="d-flex">
-         <div class="toast-body" style="font-size:12px">${esc(msg)}</div>
+         <div class="toast-body" style="font-size:12px">${body}</div>
          <button type="button" class="btn-close btn-close-white me-2 m-auto"
                  data-bs-dismiss="toast"></button>
        </div>
@@ -1104,10 +1223,16 @@ function renderMLCards(data) {
 /* ───────────────────────────────────────────────────────────────────
    LOG DETAIL MODAL
 ─────────────────────────────────────────────────────────────────── */
-let _modalIp = null;
+let _modalIp     = null;
+let _modalTs     = null;
+let _modalStatus = null;
+let _modalRow    = null;
 
 function openLogModal(row) {
-  _modalIp = row.ip;
+  _modalIp     = row.ip;
+  _modalTs     = row.timestamp;
+  _modalStatus = row.status;
+  _modalRow    = row;
 
   const scMap = {BLOCKED:'danger', ALERT:'warning', ALLOWED:'success'};
   const sc  = scMap[row.status] || 'secondary';
@@ -1304,6 +1429,18 @@ async function updateDashboard() {
     const ts = stats.latest_timestamp ? fmtTs(stats.latest_timestamp)
                                       : new Date().toLocaleTimeString();
     document.getElementById('ts-display').textContent = ts;
+
+    // Update corrections badge (lightweight — no table re-render unless section active)
+    fetch('/api/dashboard/feedback/stats')
+      .then(r => r.json())
+      .then(s => {
+        const badge = document.getElementById('corrections-badge');
+        if (badge) badge.textContent = s.validated ?? 0;
+        if (document.getElementById('section-corrections')?.classList.contains('active')) {
+          renderCorrStats(s);
+        }
+      })
+      .catch(() => {});
   } catch(e) {
     console.error('Dashboard refresh error:', e);
     toast('Refresh failed: ' + e.message, 'danger');
@@ -1399,13 +1536,210 @@ async function lookupIp() {
 }
 
 /* ───────────────────────────────────────────────────────────────────
+   FEEDBACK MODAL
+─────────────────────────────────────────────────────────────────── */
+function openFeedbackModal() {
+  if (!_modalRow) return;
+  renderFeedbackModal(_modalStatus);
+
+  // Close log modal first (Bootstrap doesn't support stacked modals well)
+  const logModal = bootstrap.Modal.getInstance(document.getElementById('log-modal'));
+  if (logModal) {
+    logModal.hide();
+    document.getElementById('log-modal').addEventListener('hidden.bs.modal', () => {
+      new bootstrap.Modal(document.getElementById('feedback-modal')).show();
+    }, { once: true });
+  } else {
+    new bootstrap.Modal(document.getElementById('feedback-modal')).show();
+  }
+}
+
+function renderFeedbackModal(status) {
+  const isBlocked = status === 'BLOCKED';
+
+  const primary = isBlocked
+    ? [
+        { val:'TP', label:'Vrai Positif', icon:'bi-check-circle-fill', cls:'success',
+          desc:'Sera ajoutée au dataset comme exemple ATTAQUE' },
+        { val:'FP', label:'Faux Positif', icon:'bi-x-circle-fill',     cls:'danger',
+          desc:'Sera ajoutée au dataset comme exemple NORMAL' },
+      ]
+    : [
+        { val:'TN', label:'Vrai Négatif', icon:'bi-check-circle',              cls:'primary',
+          desc:'Sera ajoutée au dataset comme exemple NORMAL' },
+        { val:'FN', label:'Faux Négatif', icon:'bi-exclamation-circle-fill',   cls:'warning',
+          desc:'Sera ajoutée au dataset comme exemple ATTAQUE' },
+      ];
+
+  const secondary = isBlocked
+    ? [
+        { val:'TN', label:'VN (Vrai Négatif)', icon:'bi-check-circle' },
+        { val:'FN', label:'FN (Faux Négatif)', icon:'bi-exclamation-circle' },
+      ]
+    : [
+        { val:'TP', label:'VP (Vrai Positif)', icon:'bi-check-circle-fill' },
+        { val:'FP', label:'FP (Faux Positif)', icon:'bi-x-circle-fill' },
+      ];
+
+  const statusLabel = { BLOCKED:'BLOCKED', ALLOWED:'ALLOWED', ALERT:'ALERT' }[status] || status;
+  const legend = isBlocked
+    ? `Décision WAF&nbsp;: <span class="badge bg-danger">${statusLabel}</span> — validez si l'attaque est réelle (VP) ou corrigez si erreur (FP)`
+    : `Décision WAF&nbsp;: <span class="badge bg-${status==='ALERT'?'warning':'success'}">${statusLabel}</span> — validez si requête normale (VN) ou signalez si attaque non détectée (FN)`;
+
+  const primaryHtml = primary.map(b => `
+    <div class="col-6">
+      <button class="btn btn-${b.cls} w-100 py-2 d-flex flex-column align-items-center gap-1"
+              onclick="sendFeedback('${b.val}')">
+        <i class="bi ${b.icon}" style="font-size:1.3rem"></i>
+        <span style="font-weight:600;font-size:13px">${b.label} (${b.val})</span>
+        <small style="font-size:10px;opacity:.85;line-height:1.3">${b.desc}</small>
+      </button>
+    </div>`).join('');
+
+  const secondaryHtml = secondary.map(b => `
+    <div class="col-6">
+      <button class="btn btn-outline-secondary w-100 py-1" style="opacity:.6;font-size:12px"
+              onclick="sendFeedback('${b.val}')">
+        <i class="bi ${b.icon} me-1"></i>${b.label}
+      </button>
+    </div>`).join('');
+
+  document.getElementById('feedback-modal-body').innerHTML = `
+    <p style="font-size:13px;margin-bottom:14px">${legend}</p>
+    <div class="row g-2 mb-3">${primaryHtml}</div>
+    <div style="font-size:11px;color:var(--txt-2);margin-bottom:8px">Autres options :</div>
+    <div class="row g-2 mb-3">${secondaryHtml}</div>
+    <div style="font-size:11px;color:var(--txt-2);line-height:1.8;border-top:1px solid var(--border);padding-top:10px">
+      <strong>VP/TP</strong> = attaque correctement bloquée &nbsp;
+      <strong>FP</strong> = requête normale bloquée à tort<br>
+      <strong>VN/TN</strong> = requête normale autorisée &nbsp;
+      <strong>FN</strong> = attaque non détectée
+    </div>`;
+}
+
+async function sendFeedback(validation) {
+  if (!_modalRow) { toast('Aucun événement sélectionné', 'warning'); return; }
+
+  const payload = {
+    request_str:     _modalRow.payload || _modalRow.path || '',
+    original_status: _modalRow.status  || '',
+    validation:      validation,
+    ip:              _modalRow.ip      || '',
+    path:            _modalRow.path    || '',
+    payload:         _modalRow.payload || '',
+    model:           _modalRow.model   || '',
+    attack_type:     _modalRow.category|| '',
+    score:           _modalRow.score   || 0,
+  };
+  console.log('Sending direct feedback:', payload);
+
+  try {
+    const resp = await post('/api/dashboard/feedback/direct', payload);
+    console.log('Feedback response:', resp);
+    bootstrap.Modal.getInstance(document.getElementById('feedback-modal'))?.hide();
+    toast('<i class="bi bi-check-circle me-1"></i>Feedback enregistré — inclus dans le prochain réentraînement', 'success', true);
+    await loadCorrections();
+  } catch(e) {
+    toast('Erreur feedback : ' + e.message, 'danger');
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+   CORRECTIONS
+─────────────────────────────────────────────────────────────────── */
+let _corrData   = [];
+let _corrFilter = null;
+
+async function loadCorrections() {
+  try {
+    const [data, stats] = await Promise.all([
+      fetch('/api/dashboard/feedback/corrections').then(r => r.json()),
+      fetch('/api/dashboard/feedback/stats').then(r => r.json()),
+    ]);
+    _corrData = data;
+    renderCorrStats(stats);
+    renderCorrTable(_corrFilter ? data.filter(e => e.admin_validation === _corrFilter) : data);
+    const badge = document.getElementById('corrections-badge');
+    if (badge) badge.textContent = stats.validated ?? 0;
+  } catch(e) {
+    console.error('loadCorrections:', e);
+  }
+}
+
+function renderCorrStats(s) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? '—'; };
+  set('corr-tp', s.true_positives);
+  set('corr-fp', s.false_positives);
+  set('corr-tn', s.true_negatives);
+  set('corr-fn', s.false_negatives);
+}
+
+const CORR_BADGE = {
+  TP: '<span class="badge" style="background:#dcfce7;color:#166534">TP</span>',
+  FP: '<span class="badge" style="background:#fee2e2;color:#dc2626">FP</span>',
+  TN: '<span class="badge" style="background:#dbeafe;color:#1d4ed8">TN</span>',
+  FN: '<span class="badge" style="background:#ffedd5;color:#c2410c">FN</span>',
+};
+
+function renderCorrTable(data) {
+  const tbody = document.getElementById('corr-tbody');
+  if (!tbody) return;
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Aucune correction enregistrée.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(e => `
+    <tr>
+      <td style="font-family:monospace;font-size:12px;white-space:nowrap">${esc(e.timestamp||'—')}</td>
+      <td style="font-family:monospace;font-size:12px">${esc(e.client_ip||'—')}</td>
+      <td>${e.prediction
+        ? '<span class="badge bg-danger">BLOCKED</span>'
+        : '<span class="badge bg-success">ALLOWED</span>'}</td>
+      <td>${CORR_BADGE[e.admin_validation] || esc(e.admin_validation||'—')}</td>
+      <td style="font-size:12px">${esc(e.model||'—')}</td>
+      <td style="font-size:12px">${esc(e.attack_type||'—')}</td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--txt-2)"
+          title="${esc(e.request||'')}">${esc(e.request||'—')}</td>
+      <td style="font-family:monospace;font-size:11px;white-space:nowrap">${esc((e.validation_date||'').slice(0,19)||'—')}</td>
+    </tr>`).join('');
+}
+
+function filterCorrections(type, btn) {
+  _corrFilter = type;
+  document.querySelectorAll('#corr-filter-btns .btn').forEach(b => b.classList.remove('active'));
+  btn?.classList.add('active');
+  renderCorrTable(type ? _corrData.filter(e => e.admin_validation === type) : _corrData);
+}
+
+function exportCorrectionsCsv() {
+  const data = _corrFilter ? _corrData.filter(e => e.admin_validation === _corrFilter) : _corrData;
+  if (!data.length) { toast('Aucune donnée à exporter', 'warning'); return; }
+  const cols = ['timestamp','client_ip','prediction','admin_validation','model','attack_type','request','validation_date','score','zone'];
+  const header = cols.join(',');
+  const rows = data.map(e => cols.map(c => {
+    const v = String(e[c] ?? '');
+    return v.includes(',') || v.includes('"') || v.includes('\n') ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }).join(','));
+  const csv  = [header, ...rows].join('\r\n');
+  const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url, download: `waf_corrections_${new Date().toISOString().slice(0,10)}.csv`
+  });
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`Exporté ${data.length} correction(s)`, 'success');
+}
+
+/* ───────────────────────────────────────────────────────────────────
    NAVIGATION
 ─────────────────────────────────────────────────────────────────── */
 const TITLES = {
-  overview  : 'Overview',
-  logs      : 'Event Logs',
-  'ip-manager': 'IP Manager',
-  'ml-models' : 'ML Models',
+  overview     : 'Overview',
+  logs         : 'Event Logs',
+  'ip-manager' : 'IP Manager',
+  'ml-models'  : 'ML Models',
+  corrections  : 'Corrections',
 };
 
 function showSection(name) {
@@ -1427,6 +1761,8 @@ function showSection(name) {
     requestAnimationFrame(() => CH.mlDetail.resize());
   if (name === 'overview')
     requestAnimationFrame(() => { CH.pie?.resize(); CH.line?.resize(); });
+  if (name === 'corrections')
+    loadCorrections();
 }
 
 /* ───────────────────────────────────────────────────────────────────

@@ -139,4 +139,4 @@ async def proxy_request(path: str, request: Request):
 
     # FORWARD POUR LES REQUÊTES NON BLOQUÉES
     if zone != 'attack' and zone != 'grey_zone_attack':
-        return await forward_request(request, path, TARGET_URL)
+        return await forward_request(request, TARGET_URL, path)

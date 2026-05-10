@@ -222,3 +222,4 @@ docs/changes_report.tex
 /rules
 parsed_rules.json
 docs/rule_engine_doc.tex
+logs/feedback.jsonl
