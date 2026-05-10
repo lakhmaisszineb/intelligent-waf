@@ -111,6 +111,27 @@ class IPRequest(BaseModel):
         return v
 
 
+class IPListRemoveRequest(BaseModel):
+    ip: str
+    list_type: str
+
+    @field_validator("ip")
+    @classmethod
+    def _validate_ip(cls, v: str) -> str:
+        try:
+            ipaddress.ip_address(v)
+        except ValueError:
+            raise ValueError(f"'{v}' is not a valid IP address")
+        return v
+
+    @field_validator("list_type")
+    @classmethod
+    def _validate_list_type(cls, v: str) -> str:
+        if v not in ("whitelist", "blacklist"):
+            raise ValueError("list_type must be 'whitelist' or 'blacklist'")
+        return v
+
+
 class FeedbackRequest(BaseModel):
     id: str
     validation: str
@@ -275,8 +296,10 @@ async def dashboard_logs(
     page: int = 1,
     limit: int = 50,
     log_status: Optional[str] = None,   # query param "log_status" avoids
+    status_in: Optional[str] = None,    # comma-separated statuses
     category: Optional[str] = None,     # shadowing fastapi.status in scope
     source: Optional[str] = None,
+    model: Optional[str] = None,
     ip: Optional[str] = None,
 ):
     """
@@ -287,17 +310,29 @@ async def dashboard_logs(
     page       : 1-based page number (default 1)
     limit      : entries per page, capped at 200 (default 50)
     log_status : filter by BLOCKED | ALERT | ALLOWED
+    status_in  : filter by multiple statuses, comma-separated
+                 (example: BLOCKED,ALERT)
     category   : filter by attack category, e.g. sql_injection, xss
     source     : filter by detection source: rule | ml | anomaly | clean
+    model      : filter by exact model name (case-insensitive)
     ip         : filter by client IP address
     """
     limit = min(max(limit, 1), 200)
     offset = (page - 1) * limit
+    allowed_statuses = {"BLOCKED", "ALERT", "ALLOWED"}
+    statuses = None
+    if status_in:
+        parsed = {s.strip().upper() for s in status_in.split(",") if s.strip()}
+        parsed = {s for s in parsed if s in allowed_statuses}
+        if parsed:
+            statuses = parsed
 
     filters = LogFilter(
         status=log_status.upper() if log_status else None,
+        status_in=statuses,
         category=category,
         source=source,
+        model=model,
         ip=ip,
         offset=offset,
         limit=limit,
@@ -392,7 +427,6 @@ async def add_to_whitelist(body: IPRequest):
     """
     engine = get_reputation_engine()
     engine.add_whitelist(body.ip)
-    engine.blacklist.discard(body.ip)
     return {"status": "ok", "ip": body.ip, "action": "whitelisted"}
 
 
@@ -409,8 +443,97 @@ async def add_to_blacklist(body: IPRequest):
     """
     engine = get_reputation_engine()
     engine.add_blacklist(body.ip)
-    engine.whitelist.discard(body.ip)
     return {"status": "ok", "ip": body.ip, "action": "blacklisted"}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/dashboard/ip-lists/remove
+# ---------------------------------------------------------------------------
+
+@api_router.post("/ip-lists/remove", status_code=status.HTTP_200_OK)
+async def remove_from_ip_list(body: IPListRemoveRequest):
+    """
+    Remove an IP from whitelist or blacklist.
+    """
+    engine = get_reputation_engine()
+
+    if body.list_type == "whitelist":
+        if not engine.remove_whitelist(body.ip):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"IP {body.ip} not found in whitelist",
+            )
+        action = "removed_from_whitelist"
+    else:
+        if not engine.remove_blacklist(body.ip):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"IP {body.ip} not found in blacklist",
+            )
+        action = "removed_from_blacklist"
+
+    return {"status": "ok", "ip": body.ip, "action": action}
+
+
+# ---------------------------------------------------------------------------
+# GET /api/dashboard/ip-lists
+# ---------------------------------------------------------------------------
+
+@api_router.get("/ip-lists")
+async def ip_lists(list_type: str = "all"):
+    """
+    Return the current whitelist/blacklist entries with optional filtering.
+
+    Query parameters
+    ----------------
+    list_type : "all" | "whitelist" | "blacklist"  (default: "all")
+    """
+    if list_type not in ("all", "whitelist", "blacklist"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="list_type must be 'all', 'whitelist', or 'blacklist'",
+        )
+
+    engine = get_reputation_engine()
+    whitelist = set(engine.whitelist)
+    blacklist = set(engine.blacklist)
+
+    if list_type == "whitelist":
+        ips = sorted(whitelist)
+    elif list_type == "blacklist":
+        ips = sorted(blacklist)
+    else:
+        ips = sorted(whitelist | blacklist)
+
+    items = []
+    for ip in ips:
+        blocked_until = engine.ip_blocked_until.get(ip)
+        if ip in whitelist and ip in blacklist:
+            ip_list_type = "both"
+        elif ip in whitelist:
+            ip_list_type = "whitelist"
+        else:
+            ip_list_type = "blacklist"
+
+        items.append({
+            "ip": ip,
+            "list_type": ip_list_type,
+            "is_whitelisted": ip in whitelist,
+            "is_blacklisted": ip in blacklist,
+            "is_blocked": engine.is_blocked(ip),
+            "score": engine.get_score(ip),
+            "offenses": engine.get_offenses(ip),
+            "blocked_until": blocked_until.isoformat() if blocked_until else None,
+        })
+
+    return {
+        "items": items,
+        "counts": {
+            "whitelist": len(whitelist),
+            "blacklist": len(blacklist),
+            "total_unique": len(whitelist | blacklist),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -537,6 +660,24 @@ async def feedback_corrections(validation_type: Optional[str] = None):
     if validation_type:
         data = [e for e in data if e.get("admin_validation") == validation_type]
     return data
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/dashboard/feedback/corrections/{entry_id}
+# ---------------------------------------------------------------------------
+
+@api_router.delete("/feedback/corrections/{entry_id}", status_code=status.HTTP_200_OK)
+async def delete_feedback_correction(entry_id: str):
+    """
+    Delete one correction entry from feedback.jsonl by UUID.
+    """
+    deleted = FeedbackCollector().delete_entry(entry_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Entree id={entry_id!r} introuvable dans feedback.jsonl",
+        )
+    return {"success": True, "message": "Correction supprimee", "id": entry_id}
 
 
 # ---------------------------------------------------------------------------

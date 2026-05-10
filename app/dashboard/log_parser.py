@@ -86,6 +86,13 @@ class LogEntry:
     attack_type: str  # ATTACK field value; empty for rule/clean entries
     payload: str      # request snippet logged by the WAF (truncated to 100 ch)
     score: float      # confidence / anomaly score; 0.0 when not applicable
+    master_score: Optional[float]
+    lof_score: Optional[float]
+    combined_score: Optional[float]
+    expert_score: Optional[float]
+    sqli_score: Optional[float]
+    xss_score: Optional[float]
+    hybrid_score: Optional[float]
 
     # ── Classification metadata ──────────────────────────────────────────────
     source: str       # "rule" | "ml" | "anomaly" | "clean"
@@ -103,9 +110,11 @@ class LogFilter:
     """Declarative filter consumed by :func:`get_entries`."""
 
     status: Optional[str] = None    # "BLOCKED" | "ALERT" | "ALLOWED"
+    status_in: Optional[set[str]] = None  # e.g. {"BLOCKED", "ALERT"}
     ip: Optional[str] = None
     category: Optional[str] = None  # case-insensitive match
     source: Optional[str] = None    # "rule" | "ml" | "anomaly" | "clean"
+    model: Optional[str] = None     # case-insensitive exact model name
     zone: Optional[str] = None
     since: Optional[datetime] = None
     until: Optional[datetime] = None
@@ -126,6 +135,16 @@ def _extract_score(text: str) -> float:
     """Parse numeric score from 'ML Attack Score: 0.98' style strings."""
     m = _RE_SCORE.search(text)
     return float(m.group(1)) if m else 0.0
+
+
+def _parse_float(value: Optional[str]) -> Optional[float]:
+    """Parse optional float value safely from log kv pairs."""
+    if value is None:
+        return None
+    try:
+        return float(value.strip())
+    except (ValueError, AttributeError):
+        return None
 
 
 def _classify_source(kv: dict[str, str], raison: str) -> str:
@@ -193,6 +212,13 @@ def _parse_line(line: str) -> Optional[LogEntry]:
     # anomaly/grey-zone entries use the SCORE key ("Anomaly Score: X")
     score_text = kv.get("SCORE") or raison
     score = _extract_score(score_text)
+    master_score = _parse_float(kv.get("MASTER_SCORE"))
+    lof_score = _parse_float(kv.get("LOF_SCORE"))
+    combined_score = _parse_float(kv.get("COMBINED_SCORE"))
+    expert_score = _parse_float(kv.get("EXPERT_SCORE"))
+    sqli_score = _parse_float(kv.get("SQLI_SCORE"))
+    xss_score = _parse_float(kv.get("XSS_SCORE"))
+    hybrid_score = _parse_float(kv.get("HYBRID_SCORE"))
 
     # Human-readable reason: RAISON for detections, SCORE string for alerts
     reason = raison or kv.get("SCORE", "")
@@ -211,6 +237,13 @@ def _parse_line(line: str) -> Optional[LogEntry]:
         attack_type=attack_type,
         payload=payload,
         score=score,
+        master_score=master_score,
+        lof_score=lof_score,
+        combined_score=combined_score,
+        expert_score=expert_score,
+        sqli_score=sqli_score,
+        xss_score=xss_score,
+        hybrid_score=hybrid_score,
         source=source,
         zone=zone,
     )
@@ -219,11 +252,15 @@ def _parse_line(line: str) -> Optional[LogEntry]:
 def _matches(entry: LogEntry, f: LogFilter) -> bool:
     if f.status and entry.status != f.status:
         return False
+    if f.status_in and entry.status not in f.status_in:
+        return False
     if f.ip and entry.ip != f.ip:
         return False
     if f.category and entry.category.lower() != f.category.lower():
         return False
     if f.source and entry.source != f.source:
+        return False
+    if f.model and entry.model.lower() != f.model.lower():
         return False
     if f.zone and entry.zone != f.zone:
         return False

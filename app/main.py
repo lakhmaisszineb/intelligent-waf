@@ -51,7 +51,17 @@ async def proxy_request(path: str, request: Request):
     else:
         request_str = f"{method} {path} {body_str}".strip()
 
-    result, score, zone, model, attack_type = ml_engine.detect_attack(request_str)
+    result, score, zone, model, attack_type, score_details = ml_engine.detect_attack(request_str)
+
+    ml_scores = {
+        "master_score": score_details.get("master_score"),
+        "lof_score": score_details.get("lof_score"),
+        "combined_score": score_details.get("combined_score"),
+        "expert_score": score_details.get("expert_score"),
+        "sqli_score": score_details.get("sqli_score"),
+        "xss_score": score_details.get("xss_score"),
+        "hybrid_score": score_details.get("hybrid_score"),
+    }
 
     # ZONE 1 : ATTAQUE SÛRE
     if zone == 'attack':
@@ -63,7 +73,8 @@ async def proxy_request(path: str, request: Request):
             model=model,
             attack_type=attack_type,
             payload=request_str[:100],
-            score=score
+            score=score,
+            **ml_scores
         )
         reputation_engine.update_score(client_ip, is_attack=True, is_grey_zone=False, is_blocked=True)
         feedback_collector.log_decision(request_str, True, score, zone, model, attack_type, client_ip)
@@ -80,7 +91,8 @@ async def proxy_request(path: str, request: Request):
             model=model,
             attack_type=attack_type,
             payload=request_str[:100],
-            score=score
+            score=score,
+            **ml_scores
         )
         reputation_engine.update_score(client_ip, is_attack=True, is_grey_zone=True, is_blocked=True)
         feedback_collector.log_decision(request_str, True, score, zone, model, attack_type, client_ip)
@@ -97,7 +109,8 @@ async def proxy_request(path: str, request: Request):
             model=model,
             attack_type=attack_type,
             payload=request_str[:100],
-            score=score
+            score=score,
+            **ml_scores
         )
         reputation_engine.update_score(client_ip, is_attack=False, is_grey_zone=True, is_blocked=False)
         feedback_collector.log_decision(request_str, False, score, zone, model, attack_type, client_ip)
@@ -108,7 +121,10 @@ async def proxy_request(path: str, request: Request):
             client_ip, method, path,
             blocked=False,
             reason=f"Normal Score: {score:.4f}",
-            detail=zone
+            detail=zone,
+            model=model,
+            score=score,
+            **ml_scores
         )
         reputation_engine.update_score(client_ip, is_attack=False, is_grey_zone=False, is_blocked=False)
         feedback_collector.log_decision(request_str, False, score, zone, model, attack_type, client_ip)

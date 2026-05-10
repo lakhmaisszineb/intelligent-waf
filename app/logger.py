@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 # Fix encoding Windows
 logging.basicConfig(
@@ -22,16 +23,37 @@ def log_request(
     model: str = "",
     attack_type: str = "",
     payload: str = "",
-    score: float = 0.0
+    score: float = 0.0,
+    master_score: Optional[float] = None,
+    lof_score: Optional[float] = None,
+    combined_score: Optional[float] = None,
+    expert_score: Optional[float] = None,
+    sqli_score: Optional[float] = None,
+    xss_score: Optional[float] = None,
+    hybrid_score: Optional[float] = None,
 ):
     # Tronquer le payload pour les logs
     payload_log = payload[:100] if payload else ""
+
+    def _fmt_score(name: str, value: Optional[float]) -> str:
+        return f"{name}={value:.4f} | " if value is not None else ""
+
+    score_fields = (
+        _fmt_score("MASTER_SCORE", master_score) +
+        _fmt_score("LOF_SCORE", lof_score) +
+        _fmt_score("COMBINED_SCORE", combined_score) +
+        _fmt_score("EXPERT_SCORE", expert_score) +
+        _fmt_score("SQLI_SCORE", sqli_score) +
+        _fmt_score("XSS_SCORE", xss_score) +
+        _fmt_score("HYBRID_SCORE", hybrid_score)
+    )
 
     if blocked:
         logger.warning(
             f"BLOCKED | IP={client_ip} | METHOD={method} | PATH=/{path} | "
             f"RAISON={reason} | "
             f"{'MODEL=' + model + ' | ' if model else ''}"
+            f"{score_fields}"
             f"{'ATTACK=' + attack_type + ' | ' if attack_type else ''}"
             f"{'PAYLOAD=' + payload_log + ' | ' if payload_log else ''}"
             f"{detail}"
@@ -41,9 +63,14 @@ def log_request(
             f"ALERT | IP={client_ip} | METHOD={method} | PATH=/{path} | "
             f"SCORE={reason} | "
             f"{'MODEL=' + model + ' | ' if model else ''}"
+            f"{score_fields}"
             f"ZONE={detail}"
         )
     else:
         logger.info(
-            f"ALLOWED | IP={client_ip} | METHOD={method} | PATH=/{path}"
+            f"ALLOWED | IP={client_ip} | METHOD={method} | PATH=/{path} | "
+            f"{'SCORE=' + reason + ' | ' if reason else ''}"
+            f"{'MODEL=' + model + ' | ' if model else ''}"
+            f"{score_fields}"
+            f"{'ZONE=' + detail if detail else ''}"
         )

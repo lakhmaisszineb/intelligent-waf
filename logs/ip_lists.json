@@ -1,0 +1,10 @@
+{
+  "whitelist": [
+    "127.0.0.1"
+  ],
+  "blacklist": [],
+  "ip_scores": {},
+  "ip_offenses": {},
+  "ip_blocked_until": {},
+  "updated_at": "2026-05-10T23:46:31.511007"
+}

@@ -102,6 +102,34 @@ class FeedbackCollector:
         with open(self.feedback_path, 'a') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
         return entry['id']
+
+    def delete_entry(self, entry_id: str) -> bool:
+        """
+        Supprime une entree du fichier feedback par UUID.
+        Retourne True si une entree a ete supprimee, sinon False.
+        """
+        entries = []
+        found = False
+        try:
+            with open(self.feedback_path, 'r') as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    entry = json.loads(line)
+                    if entry.get('id') == entry_id:
+                        found = True
+                        continue
+                    entries.append(entry)
+        except FileNotFoundError:
+            return False
+
+        if not found:
+            return False
+
+        with open(self.feedback_path, 'w') as f:
+            for entry in entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        return True
     
     def get_labeled_data(self):
         """Récupère toutes les données validées pour réentraînement"""
