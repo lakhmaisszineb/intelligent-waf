@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block page_title %}ProxiQ{% endblock %} — WAF Security Dashboard</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    :root {
+      --sb-w:       260px;
+      --sb-bg:      #f8f9fa;
+      --sb-txt:     #2d3748;
+      --sb-txt-hi:  #1e3a5f;
+      --sb-accent:  #1e3a5f;
+      --pg-bg:      #f1f5f9;
+      --card-bg:    #fff;
+      --border:     #e2e8f0;
+      --txt-1:      #0f172a;
+      --txt-2:      #64748b;
+      --hdr-h:      60px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; caret-color: transparent; }
+    input, textarea, select { caret-color: auto; }
+    body { margin: 0; background: var(--pg-bg); color: var(--txt-1); font-size: 14px; }
+    .app { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: var(--sb-w);
+      background: var(--sb-bg);
+      border-right: 1px solid #e2e8f0;
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      overflow-y: auto;
+    }
+
+    .sb-brand {
+      padding: 18px 22px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .sb-brand-icon { font-size: 22px; }
+    .sb-brand-name { font-size: 15px; font-weight: 700; color: #1e3a5f; line-height: 1.2; }
+    .sb-brand-sub  { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: .6px; }
+
+    .sb-nav { padding: 12px 0; flex: 1; }
+    .sb-section {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: #94a3b8; padding: 10px 22px 4px;
+    }
+    .sb-item { margin: 1px 10px; }
+    .sb-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; border-radius: 7px;
+      color: var(--sb-txt);
+      text-decoration: none;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      transition: background .12s, color .12s;
+      user-select: none;
+    }
+    .sb-link:hover  { background: #edf2f7; color: #1e3a5f; }
+    .sb-link.active { background: #e2e8f0; color: #1e3a5f; }
+    .sb-link.active .sb-icon { color: #1e3a5f; }
+    .sb-icon { font-size: 15px; width: 17px; flex-shrink: 0; }
+    .sb-badge {
+      margin-left: auto; font-size: 10px;
+      padding: 2px 7px; border-radius: 20px;
+      background: rgba(30,58,95,.12); color: #1e3a5f;
+    }
+
+    .sb-footer { padding: 14px 22px; border-top: 1px solid #e2e8f0; }
+    .waf-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #2d3748; }
+    .main { margin-left: var(--sb-w); flex: 1; display: flex; flex-direction: column; }
+
+    .hdr {
+      height: var(--hdr-h);
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 500;
+    }
+    .hdr-title { font-size: 17px; font-weight: 700; }
+    .hdr-actions { display: flex; align-items: center; gap: 14px; }
+    .hdr-ts { font-size: 11px; color: var(--txt-2); }
+
+    .content { padding: 22px; }
+
+    .kpi {
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px 18px 14px;
+      position: relative; overflow: hidden;
+      transition: transform .12s, box-shadow .12s;
+    }
+    .kpi:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.07); }
+    .kpi[role="button"] { cursor: pointer; }
+    .kpi[role="button"]:focus-visible { outline: 2px solid #1e3a5f; outline-offset: 2px; }
+    .kpi::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    }
+    .kpi-blue::before   { background: #3b82f6; }
+    .kpi-red::before    { background: #ef4444; }
+    .kpi-orange::before { background: #f97316; }
+    .kpi-green::before  { background: #22c55e; }
+    .kpi-purple::before { background: #8b5cf6; }
+    .kpi-cyan::before   { background: #06b6d4; }
+
+    .kpi-ico {
+      width: 40px; height: 40px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; margin-bottom: 10px;
+    }
+    .kpi-blue   .kpi-ico { background: #eff6ff; color: #3b82f6; }
+    .kpi-red    .kpi-ico { background: #fef2f2; color: #ef4444; }
+    .kpi-orange .kpi-ico { background: #fff7ed; color: #f97316; }
+    .kpi-green  .kpi-ico { background: #f0fdf4; color: #22c55e; }
+    .kpi-purple .kpi-ico { background: #f5f3ff; color: #8b5cf6; }
+    .kpi-cyan   .kpi-ico { background: #ecfeff; color: #06b6d4; }
+
+    .kpi-val { font-size: 26px; font-weight: 800; line-height: 1; margin-bottom: 3px; }
+    .kpi-lbl { font-size: 12px; color: var(--txt-2); font-weight: 500; }
+
+    .card-panel {
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+    }
+    .cp-hdr {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
+    }
+    .cp-title { font-size: 13px; font-weight: 600; color: var(--txt-1); }
+    .cp-body { padding: 18px; }
+
+    table.dataTable thead th {
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+      color: var(--txt-2); background: #f8fafc;
+      border-bottom: 1px solid var(--border) !important;
+    }
+    table.dataTable tbody td { font-size: 12px; vertical-align: middle; }
+    table.dataTable tbody tr:hover { background: #f8fafc !important; }
+    .payload-tag {
+      font-family: monospace; font-size: 11px;
+      background: #fef2f2; color: #dc2626;
+      padding: 2px 6px; border-radius: 4px;
+      display: inline-block; max-width: 220px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      vertical-align: middle;
+    }
+    .dataTables_wrapper .dataTables_filter input {
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 10px; font-size: 12px;
+    }
+    .dataTables_wrapper .dataTables_length select {
+      border: 1px solid var(--border); border-radius: 6px; font-size: 12px;
+    }
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate { font-size: 12px; }
+
+    .model-card {
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px; height: 100%;
+    }
+    .model-card[role="button"] { cursor: pointer; transition: transform .12s, box-shadow .12s; }
+    .model-card[role="button"]:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.07); }
+    .model-card[role="button"]:focus-visible { outline: 2px solid #1e3a5f; outline-offset: 2px; }
+    .model-ico {
+      width: 56px; height: 56px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; margin-bottom: 12px;
+    }
+    .model-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+    .model-type { font-size: 11px; color: var(--txt-2); margin-bottom: 12px; }
+
+    .ip-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+    }
+    .ip-row:last-child { border: none; }
+    .ip-lbl { color: var(--txt-2); }
+    .ip-val { font-weight: 600; }
+
+    .spin {
+      display: inline-block; width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+      border-radius: 50%; animation: rot .55s linear infinite;
+    }
+    @keyframes rot { to { transform: rotate(360deg); } }
+
+    .interval-btn { font-size: 11px !important; padding: 2px 9px !important; }
+    .interval-btn.active {
+      background: var(--sb-accent) !important;
+      color: #fff !important;
+      border-color: var(--sb-accent) !important;
+    }
+
+    .modal-field {
+      background: #f8fafc; border: 1px solid var(--border);
+      border-radius: 7px; padding: 10px 12px; height: 100%;
+    }
+    .mf-label {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px;
+      color: var(--txt-2); margin-bottom: 4px;
+    }
+    .mf-value { font-size: 13px; font-weight: 500; color: var(--txt-1); }
+
+    #logs-tbl tbody tr { cursor: pointer; }
+    #logs-tbl tbody tr:hover td { background: #f0f4ff !important; }
+    #logs-tbl td {
+      font-size: 0.875rem; vertical-align: middle; padding: 10px 12px;
+    }
+    #logs-tbl td:nth-child(1),
+    #logs-tbl td:nth-child(2) {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 0.82rem; font-weight: 500; color: #1e3a5f; letter-spacing: 0.02em;
+    }
+    #logs-tbl th:nth-child(1) { min-width: 160px; }
+    #logs-tbl th:nth-child(2) { min-width: 110px; }
+    #logs-tbl th:nth-child(3) { min-width: 90px;  }
+    #logs-tbl th:nth-child(4) { min-width: 140px; }
+    #logs-tbl thead th {
+      font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: #6c757d; background: #f8f9fa; border-bottom: 2px solid #dee2e6;
+    }
+    #corr-tbl thead th {
+      font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: #6c757d; background: #f8f9fa; border-bottom: 2px solid #dee2e6;
+      white-space: nowrap;
+    }
+    #corr-tbl td { vertical-align: middle; padding: 9px 12px; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <a class="sb-brand" href="/dashboard/overview">
+      <i class="bi bi-shield-fill sb-brand-icon text-primary"></i>
+      <div>
+        <div class="sb-brand-name">ProxiQ</div>
+        <div class="sb-brand-sub">WAF Security Dashboard</div>
+      </div>
+    </a>
+
+    <nav class="sb-nav">
+      <div class="sb-section">Monitoring</div>
+
+      <div class="sb-item">
+        <a class="sb-link {% if active_page == 'overview' %}active{% endif %}" href="/dashboard/overview">
+          <i class="bi bi-grid-1x2 sb-icon"></i>
+          Overview
+        </a>
+      </div>
+      <div class="sb-item">
+        <a class="sb-link {% if active_page == 'event-logs' %}active{% endif %}" href="/dashboard/event-logs">
+          <i class="bi bi-list-ul sb-icon"></i>
+          Event Logs
+          <span class="sb-badge" id="badge-total">-</span>
+        </a>
+      </div>
+
+      <div class="sb-section" style="margin-top:6px">Management</div>
+
+      <div class="sb-item">
+        <a class="sb-link {% if active_page == 'ip-manager' %}active{% endif %}" href="/dashboard/ip-manager">
+          <i class="bi bi-shield-check sb-icon"></i>
+          IP Manager
+        </a>
+      </div>
+      <div class="sb-item">
+        <a class="sb-link {% if active_page == 'ml-models' %}active{% endif %}" href="/dashboard/ml-models">
+          <i class="bi bi-cpu sb-icon"></i>
+          ML Models
+        </a>
+      </div>
+
+      <div class="sb-section" style="margin-top:6px">Feedback</div>
+
+      <div class="sb-item">
+        <a class="sb-link {% if active_page == 'corrections' %}active{% endif %}" href="/dashboard/corrections">
+          <i class="bi bi-flag-fill sb-icon"></i>
+          Corrections
+          <span class="sb-badge" id="corrections-badge">0</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="sb-footer">
+      <div class="waf-status">
+        <i class="bi bi-activity text-success" style="font-size:14px;flex-shrink:0"></i>
+        <span>ProxiQ Active</span>
+        <span class="badge ms-auto" style="font-size:10px;padding:3px 8px;background:#dcfce7;color:#166534">Online</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="hdr">
+      <div class="hdr-title">{% block header_title %}Dashboard{% endblock %}</div>
+      <div class="hdr-actions">
+        <div class="hdr-ts">
+          Last update:&nbsp;<span id="ts-display">-</span>
+        </div>
+        {% block header_actions %}
+        <button class="btn btn-sm btn-primary d-flex align-items-center gap-1"
+                id="btn-refresh" onclick="toggleAutoRefresh()">
+          <i class="bi bi-pause-circle"></i> Pause Auto
+        </button>
+        {% endblock %}
+      </div>
+    </header>
+
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+
+<!-- Modals -->
+<div class="modal fade" id="log-modal" tabindex="-1" aria-labelledby="log-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" id="modal-hdr">
+        <div>
+          <h5 class="modal-title mb-0" id="log-modal-title" style="font-size:15px;font-weight:700">
+            <i class="bi bi-info-circle me-2 text-primary"></i>Event Detail
+          </h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="modal-body" style="padding:16px"></div>
+      <div class="modal-footer" style="padding:10px 16px">
+        <button class="btn btn-sm btn-danger" id="modal-block-btn" onclick="blockIpFromModal()">
+          <i class="bi bi-ban me-1"></i>Block this IP
+        </button>
+        <button class="btn btn-sm btn-warning" id="feedback-btn" onclick="openFeedbackModal()">
+          <i class="bi bi-flag me-1"></i>Feedback
+        </button>
+        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="feedback-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
+    <div class="modal-content">
+      <div class="modal-header" style="padding:14px 18px">
+        <h5 class="modal-title mb-0" style="font-size:15px;font-weight:700">
+          <i class="bi bi-flag me-2 text-warning"></i>Correct this decision
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:18px">
+        <div id="feedback-modal-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="ip-detail-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:560px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title mb-0" style="font-size:15px;font-weight:700">
+          <i class="bi bi-info-circle me-2 text-primary"></i>IP Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="ip-detail-body" style="padding:16px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index:9999">
+  <div id="toasts"></div>
+</div>
+
+<!-- CDN Scripts -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+<script>
+// SHARED CONSTANTS
+const C = {
+  blocked : '#ef4444',
+  alerts  : '#f97316',
+  allowed : '#22c55e',
+  blue    : '#3b82f6',
+  purple  : '#8b5cf6',
+  cyan    : '#06b6d4',
+  cats    : ['#3b82f6','#ef4444','#f97316','#22c55e',
+             '#8b5cf6','#06b6d4','#ec4899','#eab308','#14b8a6','#f43f5e'],
+};
+
+const ATTACK_LABELS = {
+  sql_injection : 'SQL Injection',
+  xss           : 'XSS',
+  rce           : 'RCE / CMDi',
+  lfi           : 'LFI / Path Traversal',
+  php_injection : 'PHP Injection',
+  ml_attack     : 'ML Detection',
+  other         : 'Other',
+};
+function attackLabel(k) { return ATTACK_LABELS[k] || k || '-'; }
+
+// UTILITIES
+const esc = s => String(s??'').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function fmtTs(ts) {
+  if (!ts) return '-';
+  return String(ts).replace('T',' ').slice(0,19);
+}
+
+function statusBadge(s) {
+  const m = {BLOCKED:'danger', ALERT:'warning', ALLOWED:'success'};
+  return `<span class="badge bg-${m[s]||'secondary'}" style="font-size:10px">${esc(s)}</span>`;
+}
+
+function scoreCell(v) {
+  if (!v) return '<span class="text-muted">-</span>';
+  const p   = (v * 100).toFixed(1);
+  const cls = v >= .8 ? 'danger' : v >= .5 ? 'warning' : 'secondary';
+  const txt = v >= .8 ? 'text-white' : v >= .5 ? 'text-dark' : 'text-white';
+  return `<span class="badge bg-${cls} ${txt}" style="font-size:10px">${p}%</span>`;
+}
+
+function toast(msg, type='success', html=false) {
+  const id  = 'toast-' + Date.now();
+  const BG  = {success:'bg-success', danger:'bg-danger', warning:'bg-warning', info:'bg-info'};
+  const bg  = BG[type] || 'bg-info';
+  const body = html ? msg : esc(msg);
+  document.getElementById('toasts').insertAdjacentHTML('beforeend',
+    `<div id="${id}" class="toast align-items-center text-white ${bg} border-0" role="alert">
+       <div class="d-flex">
+         <div class="toast-body" style="font-size:12px">${body}</div>
+         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+       </div>
+     </div>`);
+  const el = document.getElementById(id);
+  new bootstrap.Toast(el, {delay:3200}).show();
+  el.addEventListener('hidden.bs.toast', () => el.remove());
+}
+
+// API HELPERS
+async function get(url) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 10000);
+  const r = await fetch(url, { signal: ctl.signal }).finally(() => clearTimeout(t));
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+async function post(url, body) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 10000);
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+    signal: ctl.signal
+  }).finally(() => clearTimeout(t));
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({detail:'Request failed'}));
+    throw new Error(e.detail || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+async function del(url) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 10000);
+  const r = await fetch(url, { method: 'DELETE', signal: ctl.signal }).finally(() => clearTimeout(t));
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({detail:'Request failed'}));
+    throw new Error(e.detail || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+// AUTO-REFRESH FRAMEWORK
+let autoRefreshEnabled = true;
+let autoTimer = null;
+let _refreshTick = 0;
+const AUTO_MS = 1000;
+
+function updateRefreshButton() {
+  const btn = document.getElementById('btn-refresh');
+  if (!btn) return;
+  if (autoRefreshEnabled) {
+    btn.classList.replace('btn-success', 'btn-primary');
+    btn.innerHTML = '<i class="bi bi-pause-circle"></i> Pause Auto';
+  } else {
+    btn.classList.replace('btn-primary', 'btn-success');
+    btn.innerHTML = '<i class="bi bi-play-circle"></i> Resume Auto';
+  }
+}
+
+function startAutoRefresh() {
+  clearInterval(autoTimer);
+  _refreshTick = 0;
+  autoTimer = setInterval(async () => {
+    if (!autoRefreshEnabled) return;
+    if (typeof updateDashboard === 'function') await updateDashboard();
+    if (++_refreshTick % 10 === 0) await loadSidebarBadges();
+  }, AUTO_MS);
+}
+
+function stopAutoRefresh() {
+  clearInterval(autoTimer);
+  autoTimer = null;
+}
+
+async function toggleAutoRefresh() {
+  autoRefreshEnabled = !autoRefreshEnabled;
+  updateRefreshButton();
+  if (autoRefreshEnabled) {
+    if (typeof updateDashboard === 'function') await updateDashboard();
+    startAutoRefresh();
+    toast('Auto refresh resumed', 'info');
+  } else {
+    stopAutoRefresh();
+    toast('Auto refresh paused', 'warning');
+  }
+}
+
+// CROSS-PAGE NAVIGATION
+function openLogsFromKpi(kind) {
+  const map = {
+    blocked: 'filter=blocked',
+    alerts:  'filter=alerts',
+    allowed: 'filter=allowed',
+    rules:   'filter=rules',
+    ml:      'filter=ml',
+  };
+  const qs = map[kind] ? '?' + map[kind] : '';
+  window.location.href = '/dashboard/event-logs' + qs;
+}
+
+function openLogsFromModel(modelName) {
+  window.location.href = '/dashboard/event-logs?model=' + encodeURIComponent(modelName);
+}
+
+// SIDEBAR BADGE LOADER (runs on every page)
+async function loadSidebarBadges() {
+  try {
+    const [stats, corrStats] = await Promise.all([
+      get('/api/dashboard/stats'),
+      get('/api/dashboard/feedback/stats'),
+    ]);
+    const b = document.getElementById('badge-total');
+    if (b) b.textContent = stats.total ?? '-';
+    const cb = document.getElementById('corrections-badge');
+    if (cb) cb.textContent = corrStats.validated ?? 0;
+    const ts = document.getElementById('ts-display');
+    if (ts) ts.textContent = stats.latest_timestamp
+      ? fmtTs(stats.latest_timestamp)
+      : new Date().toLocaleTimeString();
+  } catch(e) {}
+}
+</script>
+
+{% block scripts %}{% endblock %}
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  updateRefreshButton();
+  await loadSidebarBadges();
+});
+</script>
+</body>
+</html>

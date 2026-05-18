@@ -41,35 +41,44 @@ def log_request(
     score_fields = (
         _fmt_score("MASTER_SCORE", master_score) +
         _fmt_score("LOF_SCORE", lof_score) +
-        _fmt_score("COMBINED_SCORE", combined_score) +
-        _fmt_score("EXPERT_SCORE", expert_score) +
         _fmt_score("SQLI_SCORE", sqli_score) +
-        _fmt_score("XSS_SCORE", xss_score) +
-        _fmt_score("HYBRID_SCORE", hybrid_score)
+        _fmt_score("XSS_SCORE", xss_score)
     )
 
     if blocked:
+        display_reason = reason
+        if not model and (
+            reason.startswith("Attaque dans")
+            or reason.startswith("Scanner")
+            or reason.startswith("Methode")
+            or reason.startswith("MÃ©thode")
+        ):
+            display_reason = "Rule Engine"
+
+        detail_field = f"ZONE={detail}" if model and detail else detail
+
         logger.warning(
             f"BLOCKED | IP={client_ip} | METHOD={method} | PATH=/{path} | "
+            f"RAISON={display_reason} | "
+            f"{'MODEL=' + model + ' | ' if model else ''}"
+            f"{score_fields}"
+            f"{'ATTACK=' + attack_type + ' | ' if attack_type else ''}"
+            f"{'PAYLOAD=' + payload_log + ' | ' if payload_log else ''}"
+            f"{detail_field}"
+        )
+    elif alert:
+        logger.warning(
+            f"ALERT | IP={client_ip} | METHOD={method} | PATH=/{path} | "
             f"RAISON={reason} | "
             f"{'MODEL=' + model + ' | ' if model else ''}"
             f"{score_fields}"
             f"{'ATTACK=' + attack_type + ' | ' if attack_type else ''}"
             f"{'PAYLOAD=' + payload_log + ' | ' if payload_log else ''}"
-            f"{detail}"
-        )
-    elif alert:
-        logger.warning(
-            f"ALERT | IP={client_ip} | METHOD={method} | PATH=/{path} | "
-            f"SCORE={reason} | "
-            f"{'MODEL=' + model + ' | ' if model else ''}"
-            f"{score_fields}"
             f"ZONE={detail}"
         )
     else:
         logger.info(
             f"ALLOWED | IP={client_ip} | METHOD={method} | PATH=/{path} | "
-            f"{'SCORE=' + reason + ' | ' if reason else ''}"
             f"{'MODEL=' + model + ' | ' if model else ''}"
             f"{score_fields}"
             f"{'ZONE=' + detail if detail else ''}"

@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+
+{% block page_title %}IP Manager{% endblock %}
+{% block header_title %}IP Manager{% endblock %}
+
+{% block header_actions %}
+<!-- No auto-refresh on this page -->
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Add to Whitelist -->
+  <div class="col-md-6">
+    <div class="card-panel h-100">
+      <div class="cp-hdr">
+        <span class="cp-title">
+          <i class="bi bi-shield-check me-1 text-success"></i>Whitelist
+        </span>
+      </div>
+      <div class="cp-body">
+        <p class="text-muted mb-3" style="font-size:12px">
+          IPs in this list bypass all WAF rules and ML checks.
+        </p>
+        <div class="input-group input-group-sm">
+          <input type="text" class="form-control" id="wl-ip"
+                 placeholder="e.g. 192.168.1.10"
+                 onkeydown="if(event.key==='Enter') addWhitelist()">
+          <button class="btn btn-success" onclick="addWhitelist()">
+            <i class="bi bi-plus-circle me-1"></i>Add
+          </button>
+        </div>
+        <div id="wl-fb" class="mt-2" style="min-height:22px;font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to Blacklist -->
+  <div class="col-md-6">
+    <div class="card-panel h-100">
+      <div class="cp-hdr">
+        <span class="cp-title">
+          <i class="bi bi-shield-x me-1 text-danger"></i>Blacklist
+        </span>
+      </div>
+      <div class="cp-body">
+        <p class="text-muted mb-3" style="font-size:12px">
+          IPs in this list are permanently blocked before any analysis.
+        </p>
+        <div class="input-group input-group-sm">
+          <input type="text" class="form-control" id="bl-ip"
+                 placeholder="e.g. 10.0.0.55"
+                 onkeydown="if(event.key==='Enter') addBlacklist()">
+          <button class="btn btn-danger" onclick="addBlacklist()">
+            <i class="bi bi-ban me-1"></i>Block
+          </button>
+        </div>
+        <div id="bl-fb" class="mt-2" style="min-height:22px;font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IP Reputation Scores (unified — all IPs, all statuses) -->
+  <div class="col-12">
+    <div class="card-panel">
+      <div class="cp-hdr">
+        <span class="cp-title">
+          <i class="bi bi-bar-chart-line me-1 text-primary"></i>IP Reputation Scores
+          <span class="badge bg-secondary ms-2" id="scores-count">0</span>
+          <span class="badge bg-warning text-dark ms-1 d-none" id="banned-count" title="IPs currently under temporary ban">
+            <i class="bi bi-clock-history me-1"></i><span id="banned-num">0</span> Banned
+          </span>
+        </span>
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadIpScores()">
+          <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+        </button>
+      </div>
+      <div class="cp-body">
+        <p class="text-muted mb-3" style="font-size:12px">
+          All IPs tracked by the reputation engine. Click any row to view its full log history.
+          Temporary bans expire automatically — use the Actions menu to intervene.
+        </p>
+        <div class="row g-2 mb-3">
+          <div class="col-sm-6">
+            <input type="text" class="form-control form-control-sm" id="scores-search"
+                   placeholder="Search IP address..."
+                   oninput="renderScoresTable()">
+          </div>
+          <div class="col-sm-6">
+            <select id="scores-filter" class="form-select form-select-sm" onchange="renderScoresTable()">
+              <option value="all">All IPs</option>
+              <option value="banned">Temp. Banned</option>
+              <option value="high">High risk (score ≥ 70)</option>
+              <option value="medium">Medium risk (score 30–69)</option>
+              <option value="low">Low risk (score &lt; 30)</option>
+              <option value="whitelisted">Whitelisted</option>
+              <option value="blacklisted">Blacklisted</option>
+            </select>
+          </div>
+        </div>
+        <div id="scores-container">
+          <div class="text-center text-muted py-3" style="font-size:12px">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ─── Add forms ──────────────────────────────────────────────────────────── */
+
+async function addWhitelist() {
+  const ip = document.getElementById('wl-ip').value.trim();
+  const fb = document.getElementById('wl-fb');
+  if (!ip) { fb.innerHTML = '<span class="text-warning">Enter an IP.</span>'; return; }
+  try {
+    await post('/api/dashboard/whitelist', { ip });
+    fb.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${esc(ip)} whitelisted.</span>`;
+    document.getElementById('wl-ip').value = '';
+    toast(ip + ' added to whitelist');
+    await loadIpScores();
+  } catch(e) {
+    fb.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${esc(e.message)}</span>`;
+  }
+}
+
+async function addBlacklist() {
+  const ip = document.getElementById('bl-ip').value.trim();
+  const fb = document.getElementById('bl-fb');
+  if (!ip) { fb.innerHTML = '<span class="text-warning">Enter an IP.</span>'; return; }
+  try {
+    await post('/api/dashboard/blacklist', { ip });
+    fb.innerHTML = `<span class="text-danger"><i class="bi bi-check-circle me-1"></i>${esc(ip)} blacklisted.</span>`;
+    document.getElementById('bl-ip').value = '';
+    toast(ip + ' blacklisted', 'danger');
+    await loadIpScores();
+  } catch(e) {
+    fb.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${esc(e.message)}</span>`;
+  }
+}
+
+/* ─── IP Reputation Scores (unified table) ───────────────────────────────── */
+
+let scoresData     = [];
+let scoresLoadedAt = 0;
+let scoresTimer    = null;
+
+function fmtBanTime(seconds) {
+  if (seconds <= 0) return '0s';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function ipStatusBadge(item) {
+  if (item.is_blacklisted) {
+    return `<span class="badge bg-danger" style="font-size:11px">Blacklisted</span>`;
+  }
+  if (item.is_whitelisted) {
+    return `<span class="badge bg-success" style="font-size:11px">Whitelisted</span>`;
+  }
+  if (item.is_temp_blocked && item.time_remaining_seconds != null) {
+    const elapsed    = Math.floor((Date.now() - scoresLoadedAt) / 1000);
+    const remaining  = Math.max(0, item.time_remaining_seconds - elapsed);
+    const urgency    = remaining < 60 ? 'danger' : remaining < 900 ? 'warning text-dark' : 'warning text-dark';
+    return `<span class="badge bg-${urgency} ip-ban-badge" data-ip="${esc(item.ip)}"
+                  style="font-size:11px;white-space:nowrap">
+              <i class="bi bi-clock me-1" style="font-size:9px"></i>Banned · ${fmtBanTime(remaining)}
+            </span>`;
+  }
+  return `<span class="badge bg-secondary" style="font-size:11px">Tracked</span>`;
+}
+
+function ipActionButtons(item) {
+  const ip = esc(item.ip);
+
+  if (item.is_whitelisted) {
+    return `<button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:2px 10px;white-space:nowrap"
+                    onclick="event.stopPropagation(); removeFromList('${ip}','whitelist')">
+              <i class="bi bi-x-circle me-1"></i>Remove from Whitelist
+            </button>`;
+  }
+
+  if (item.is_blacklisted) {
+    return `<button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:2px 10px;white-space:nowrap"
+                    onclick="event.stopPropagation(); removeFromList('${ip}','blacklist')">
+              <i class="bi bi-x-circle me-1"></i>Remove from Blacklist
+            </button>`;
+  }
+
+  if (item.is_temp_blocked) {
+    return `<div class="d-flex gap-1" onclick="event.stopPropagation()">
+              <button class="btn btn-sm btn-outline-success" style="font-size:11px;padding:2px 10px"
+                      onclick="unblockIp('${ip}')">
+                <i class="bi bi-unlock-fill me-1"></i>Unblock
+              </button>
+              <button class="btn btn-sm btn-danger" style="font-size:11px;padding:2px 10px"
+                      onclick="addToBlacklistScore('${ip}')">
+                <i class="bi bi-ban me-1"></i>Blacklist
+              </button>
+            </div>`;
+  }
+
+  /* Tracked — offer both options via dropdown */
+  return `<div class="dropdown" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                    style="font-size:11px;padding:2px 10px"
+                    data-bs-toggle="dropdown">
+              Actions
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" style="font-size:12px;min-width:170px">
+              <li>
+                <a class="dropdown-item text-success" href="#"
+                   onclick="event.preventDefault(); addToWhitelistScore('${ip}')">
+                  <i class="bi bi-shield-check me-2"></i>Add to Whitelist
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item text-danger" href="#"
+                   onclick="event.preventDefault(); addToBlacklistScore('${ip}')">
+                  <i class="bi bi-ban me-2"></i>Add to Blacklist
+                </a>
+              </li>
+            </ul>
+          </div>`;
+}
+
+function renderScoresTable() {
+  const container = document.getElementById('scores-container');
+  if (!container) return;
+
+  const query  = (document.getElementById('scores-search')?.value || '').trim().toLowerCase();
+  const filter = document.getElementById('scores-filter')?.value || 'all';
+
+  const filtered = scoresData.filter(item => {
+    if (query && !String(item.ip || '').toLowerCase().includes(query)) return false;
+    switch (filter) {
+      case 'banned':      return item.is_temp_blocked;
+      case 'high':        return item.score >= 70;
+      case 'medium':      return item.score >= 30 && item.score < 70;
+      case 'low':         return item.score < 30;
+      case 'whitelisted': return item.is_whitelisted;
+      case 'blacklisted': return item.is_blacklisted;
+      default:            return true;
+    }
+  });
+
+  const totalBanned = scoresData.filter(x => x.is_temp_blocked).length;
+  const scBadge = document.getElementById('scores-count');
+  if (scBadge) scBadge.textContent = filtered.length;
+  const bnBadge  = document.getElementById('banned-count');
+  const bnNum    = document.getElementById('banned-num');
+  if (bnBadge && bnNum) {
+    bnNum.textContent = totalBanned;
+    bnBadge.classList.toggle('d-none', totalBanned === 0);
+  }
+
+  if (!filtered.length) {
+    container.innerHTML = `
+      <div class="text-center py-4 text-muted">
+        <i class="bi bi-search" style="font-size:2rem;opacity:.25"></i>
+        <div class="mt-2" style="font-size:12px">No IPs match this filter.</div>
+      </div>`;
+    return;
+  }
+
+  const rows = filtered.map(item => {
+    const score    = item.score ?? 0;
+    const pct      = Math.min(100, score);
+    const scoreCls = score >= 70 ? 'danger' : score >= 30 ? 'warning' : 'success';
+
+    return `<tr role="button" style="cursor:pointer"
+                onclick="openIpLogs('${esc(item.ip)}')"
+                title="View logs for ${esc(item.ip)}">
+      <td>
+        <div class="d-flex align-items-center gap-2">
+          <code style="font-size:12px;font-weight:600">${esc(item.ip)}</code>
+          <i class="bi bi-box-arrow-up-right text-muted" style="font-size:10px;opacity:.5"></i>
+        </div>
+      </td>
+      <td>${ipStatusBadge(item)}</td>
+      <td>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-${scoreCls}" style="min-width:36px">${score}</span>
+          <div class="progress flex-grow-1" style="height:4px;max-width:60px">
+            <div class="progress-bar bg-${scoreCls}" style="width:${pct}%"></div>
+          </div>
+        </div>
+      </td>
+      <td>${item.offenses ?? 0}</td>
+      <td>${item.total_requests ?? 0}</td>
+      <td>${item.total_attacks ?? 0}</td>
+      <td>${item.total_alerts ?? 0}</td>
+      <td>${ipActionButtons(item)}</td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0" style="font-size:12px">
+        <thead>
+          <tr>
+            <th>IP Address</th>
+            <th>Status</th>
+            <th>Risk Score <span class="text-muted fw-normal">/100</span></th>
+            <th>Offenses</th>
+            <th>Requests</th>
+            <th>Attacks</th>
+            <th>Alerts</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+async function loadIpScores() {
+  const container = document.getElementById('scores-container');
+  if (container) container.innerHTML =
+    '<div class="text-center text-muted py-3" style="font-size:12px">Loading…</div>';
+  try {
+    const d        = await get('/api/dashboard/ip-scores');
+    scoresData     = d.items || [];
+    scoresLoadedAt = Date.now();
+    renderScoresTable();
+    startBanCountdown();
+  } catch(e) {
+    if (container) container.innerHTML =
+      `<div class="text-danger py-2" style="font-size:12px"><i class="bi bi-x-circle me-1"></i>${esc(e.message)}</div>`;
+  }
+}
+
+/* Countdown — updates only the ban badge cells every second */
+function startBanCountdown() {
+  if (scoresTimer) clearInterval(scoresTimer);
+  scoresTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - scoresLoadedAt) / 1000);
+    document.querySelectorAll('.ip-ban-badge').forEach(badge => {
+      const ip   = badge.dataset.ip;
+      const item = scoresData.find(x => x.ip === ip);
+      if (!item || item.time_remaining_seconds == null) return;
+      const remaining = Math.max(0, item.time_remaining_seconds - elapsed);
+      if (remaining === 0) {
+        badge.className = 'badge bg-secondary';
+        badge.innerHTML = 'Tracked';
+      } else {
+        const urgency = remaining < 60 ? 'danger' : 'warning text-dark';
+        badge.className = `badge bg-${urgency} ip-ban-badge`;
+        badge.dataset.ip = ip;
+        badge.innerHTML = `<i class="bi bi-clock me-1" style="font-size:9px"></i>Banned · ${fmtBanTime(remaining)}`;
+      }
+    });
+  }, 1000);
+}
+
+function openIpLogs(ip) {
+  window.location.href = `/dashboard/event-logs?ip=${encodeURIComponent(ip)}`;
+}
+
+async function removeFromList(ip, listType) {
+  try {
+    await post('/api/dashboard/ip-lists/remove', { ip, list_type: listType });
+    toast(`${ip} removed from ${listType}`, 'success');
+    await loadIpScores();
+  } catch(e) {
+    toast('Remove failed: ' + e.message, 'danger');
+  }
+}
+
+async function unblockIp(ip) {
+  try {
+    await post('/api/dashboard/unblock', { ip });
+    toast(`${ip} unblocked`, 'success');
+    await loadIpScores();
+  } catch(e) {
+    toast('Unblock failed: ' + e.message, 'danger');
+  }
+}
+
+async function addToWhitelistScore(ip) {
+  try {
+    await post('/api/dashboard/whitelist', { ip });
+    toast(`${ip} added to whitelist`, 'success');
+    await loadIpScores();
+  } catch(e) {
+    toast('Whitelist failed: ' + e.message, 'danger');
+  }
+}
+
+async function addToBlacklistScore(ip) {
+  try {
+    await post('/api/dashboard/blacklist', { ip });
+    toast(`${ip} added to blacklist`, 'danger');
+    await loadIpScores();
+  } catch(e) {
+    toast('Blacklist failed: ' + e.message, 'danger');
+  }
+}
+
+/* ─── Init ───────────────────────────────────────────────────────────────── */
+
+document.addEventListener('DOMContentLoaded', () => loadIpScores());
+</script>
+{% endblock %}

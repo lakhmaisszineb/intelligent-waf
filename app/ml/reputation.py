@@ -75,11 +75,11 @@ class IPReputationEngine:
                 "ip_scores": dict(sorted(self.ip_scores.items())),
                 "ip_offenses": dict(sorted(self.ip_offenses.items())),
                 "ip_blocked_until": {
-                    ip: until.isoformat()
+                    ip: until.strftime('%Y-%m-%d %H:%M:%S')
                     for ip, until in sorted(self.ip_blocked_until.items())
                     if until and until != datetime.min
                 },
-                "updated_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             }
             with open(self.storage_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
@@ -169,5 +169,6 @@ class IPReputationEngine:
     def unblock_ip(self, ip):
         if ip in self.ip_blocked_until:
             del self.ip_blocked_until[ip]
-        self.ip_scores[ip] = max(0, self.ip_scores.get(ip, 0) - 50)
+        self.ip_scores[ip]   = 0
+        self.ip_offenses[ip] = 0
         self._persist_lists()

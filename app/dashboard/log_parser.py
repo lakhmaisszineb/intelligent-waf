@@ -1,23 +1,23 @@
-"""
-WAF Log Parser — production-grade parser for logs/waf.log.
+﻿"""
+WAF Log Parser â€” production-grade parser for logs/waf.log.
 
 Four log formats are emitted by app/logger.py:
 
     BLOCKED (rule-based)
-        <ts> - WARNING - BLOCKED | IP=… | METHOD=… | PATH=… |
-        RAISON=<text> | Catégorie=<cat> | Payload=<payload>
+        <ts> - WARNING - BLOCKED | IP=â€¦ | METHOD=â€¦ | PATH=â€¦ |
+        RAISON=<text> | CatÃ©gorie=<cat> | Payload=<payload>
 
-    BLOCKED (ML model — zone 'attack' or 'grey_zone_attack')
-        <ts> - WARNING - BLOCKED | IP=… | METHOD=… | PATH=… |
+    BLOCKED (ML model â€” zone 'attack' or 'grey_zone_attack')
+        <ts> - WARNING - BLOCKED | IP=â€¦ | METHOD=â€¦ | PATH=â€¦ |
         RAISON=ML Attack Score: <score> | MODEL=<name> | ATTACK=<type> |
         PAYLOAD=<payload> | attack
 
-    ALERT (grey zone / anomaly — zone 'grey_zone_normal' / 'anomaly_alert')
-        <ts> - WARNING - ALERT | IP=… | METHOD=… | PATH=… |
+    ALERT (grey zone / anomaly â€” zone 'grey_zone_normal' / 'anomaly_alert')
+        <ts> - WARNING - ALERT | IP=â€¦ | METHOD=â€¦ | PATH=â€¦ |
         SCORE=<score-string> | MODEL=<name> | ZONE=<zone>
 
-    ALLOWED (clean — zone 'normal')
-        <ts> - INFO - ALLOWED | IP=… | METHOD=… | PATH=…
+    ALLOWED (clean â€” zone 'normal')
+        <ts> - INFO - ALLOWED | IP=â€¦ | METHOD=â€¦ | PATH=â€¦
 
 All public functions are safe to call when the log file does not yet exist.
 """
@@ -46,8 +46,8 @@ _RE_PREFIX = re.compile(
 )
 
 # Extracts key=value pairs; values stop at the pipe separator.
-# Handles accented keys such as Catégorie (À–ÿ range covers all Latin-1).
-_RE_KV = re.compile(r"([A-Za-zÀ-ÿ_]+)=([^|]+)")
+# Handles accented keys such as CatÃ©gorie (Ã€â€“Ã¿ range covers all Latin-1).
+_RE_KV = re.compile(r"([^=\s|]+)=([^|]+)")
 
 # Extracts the numeric part from strings like "ML Attack Score: 0.9862"
 # or "Grey Zone Normal Score: 0.4285" or "Anomaly Score: 0.0057".
@@ -70,18 +70,18 @@ _ZONE_TO_SOURCE: dict[str, str] = {
 class LogEntry:
     """Immutable representation of one WAF log line."""
 
-    # ── Core request fields ──────────────────────────────────────────────────
+    # â”€â”€ Core request fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     timestamp: datetime
     ip: str
     method: str
     path: str
 
-    # ── Decision fields ──────────────────────────────────────────────────────
+    # â”€â”€ Decision fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     status: str       # "BLOCKED" | "ALERT" | "ALLOWED"
     reason: str       # RAISON text (rule) or SCORE string (anomaly)
-    category: str     # attack category: Catégorie (rule) or ATTACK (ML)
+    category: str     # attack category: CatÃ©gorie (rule) or ATTACK (ML)
 
-    # ── ML / model fields ────────────────────────────────────────────────────
+    # â”€â”€ ML / model fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     model: str        # ML model name; empty for rule-based entries
     attack_type: str  # ATTACK field value; empty for rule/clean entries
     payload: str      # request snippet logged by the WAF (truncated to 100 ch)
@@ -94,14 +94,14 @@ class LogEntry:
     xss_score: Optional[float]
     hybrid_score: Optional[float]
 
-    # ── Classification metadata ──────────────────────────────────────────────
+    # â”€â”€ Classification metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     source: str       # "rule" | "ml" | "anomaly" | "clean"
     zone: str         # raw ZONE field or empty string
 
     def to_dict(self) -> dict:
         """Return a JSON-serialisable dict (timestamp converted to ISO string)."""
         d = asdict(self)
-        d["timestamp"] = self.timestamp.isoformat()
+        d["timestamp"] = self.timestamp.strftime('%Y-%m-%d %H:%M:%S')
         return d
 
 
@@ -147,21 +147,36 @@ def _parse_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def _model_names(model: str) -> list[str]:
+    """Split a model field that may contain multiple ML contributors."""
+    return [m.strip() for m in re.split(r"[,;+]", model or "") if m.strip()]
+
+
+def _category_value(kv: dict[str, str]) -> str:
+    """Read the rule-engine category key across encoding variants."""
+    for key, value in kv.items():
+        if key.startswith("Cat"):
+            return value
+    return ""
+
+
 def _classify_source(kv: dict[str, str], raison: str) -> str:
     """
     Derive detection source from the key-value pairs of a log line.
 
     Priority order mirrors the detection pipeline in app/main.py:
-    anomaly alerts → ML detections → rule engine → clean traffic.
+    anomaly alerts â†’ ML detections â†’ rule engine â†’ clean traffic.
     """
     zone = kv.get("ZONE", "")
     if zone in _ZONE_TO_SOURCE:
         return _ZONE_TO_SOURCE[zone]
+    if raison == "Rule Engine":
+        return "rule"
     if "MODEL" in kv and "ATTACK" in kv:
         return "ml"
     if "Score" in raison:           # ML Attack Score / Grey Zone Score
         return "ml"
-    if "Catégorie" in kv or "Categorie" in kv:
+    if _category_value(kv):
         return "rule"
     return "clean"
 
@@ -171,7 +186,7 @@ def _parse_line(line: str) -> Optional[LogEntry]:
     Parse a single log line into a LogEntry.
 
     Returns None for empty lines, comment lines, or lines that do not match
-    any known format — allowing the caller to skip them silently.
+    any known format â€” allowing the caller to skip them silently.
     """
     line = line.rstrip()
     if not line:
@@ -196,15 +211,20 @@ def _parse_line(line: str) -> Optional[LogEntry]:
     model = kv.get("MODEL", "")
     attack_type = kv.get("ATTACK", "")
     zone = kv.get("ZONE", "")
+    if zone.startswith("Cat") and "=" in zone:
+        zone_category = zone.split("=", 1)[1].strip()
+        zone = ""
+    else:
+        zone_category = ""
 
     # Payload: rule-based entries use "Payload" (capitalised), ML uses "PAYLOAD"
     payload = kv.get("Payload") or kv.get("PAYLOAD") or ""
 
-    # Category: rule engine writes Catégorie, ML pipeline uses ATTACK field
+    # Category: rule engine writes CatÃ©gorie, ML pipeline uses ATTACK field
     category = (
-        kv.get("Catégorie")
-        or kv.get("Categorie")
+        _category_value(kv)
         or kv.get("ATTACK")
+        or zone_category
         or ""
     )
 
@@ -219,6 +239,22 @@ def _parse_line(line: str) -> Optional[LogEntry]:
     sqli_score = _parse_float(kv.get("SQLI_SCORE"))
     xss_score = _parse_float(kv.get("XSS_SCORE"))
     hybrid_score = _parse_float(kv.get("HYBRID_SCORE"))
+
+    if score == 0.0:
+        model_scores = [
+            v for v in (
+                master_score,
+                lof_score,
+                combined_score,
+                expert_score,
+                sqli_score,
+                xss_score,
+                hybrid_score,
+            )
+            if v is not None
+        ]
+        if model_scores:
+            score = max(model_scores)
 
     # Human-readable reason: RAISON for detections, SCORE string for alerts
     reason = raison or kv.get("SCORE", "")
@@ -260,7 +296,7 @@ def _matches(entry: LogEntry, f: LogFilter) -> bool:
         return False
     if f.source and entry.source != f.source:
         return False
-    if f.model and entry.model.lower() != f.model.lower():
+    if f.model and f.model.lower() not in [m.lower() for m in _model_names(entry.model)]:
         return False
     if f.zone and entry.zone != f.zone:
         return False
@@ -332,7 +368,7 @@ def get_entries_as_dicts(
     """
     Convenience wrapper around :func:`get_entries`.
 
-    Returns JSON-serialisable dicts instead of dataclass instances —
+    Returns JSON-serialisable dicts instead of dataclass instances â€”
     suitable for direct use in FastAPI response bodies.
     """
     return [e.to_dict() for e in get_entries(filters, log_file)]
@@ -346,15 +382,16 @@ def get_stats(log_file: Path = _LOG_FILE) -> dict:
     -------
     dict with keys:
         total, blocked, alerts, allowed,
-        by_category  — {category: count} sorted by frequency (all categories),
-        by_ip        — top-10 {ip: count},
-        by_method    — {method: count},
-        by_source    — {source: count},
-        by_zone      — {zone: count},
-        top_paths    — top-10 {path: count},
-        latest_timestamp — ISO-8601 string of the most recent log entry, or None.
+        by_category  â€” {category: count} sorted by frequency (all categories),
+        by_ip        â€” top-10 {ip: count},
+        by_method    â€” {method: count},
+        by_source    â€” {source: count},
+        by_zone      â€” {zone: count},
+        top_paths    â€” top-10 {path: count},
+        latest_timestamp â€” ISO-8601 string of the most recent log entry, or None.
     """
     total = blocked = alerts = allowed = 0
+    blocked_by_ml = blocked_by_rule = 0
     by_category: dict[str, int] = {}
     by_ip: dict[str, int] = {}
     by_method: dict[str, int] = {}
@@ -368,6 +405,11 @@ def get_stats(log_file: Path = _LOG_FILE) -> dict:
 
         if entry.status == "BLOCKED":
             blocked += 1
+            # ML source: ml or anomaly — everything else counts as rule-based
+            if entry.source in ("ml", "anomaly"):
+                blocked_by_ml += 1
+            else:
+                blocked_by_rule += 1
         elif entry.status == "ALERT":
             alerts += 1
         elif entry.status == "ALLOWED":
@@ -390,18 +432,36 @@ def get_stats(log_file: Path = _LOG_FILE) -> dict:
             latest_ts = entry.timestamp
 
     return {
-        "total": total,
-        "blocked": blocked,
-        "alerts": alerts,
-        "allowed": allowed,
-        "by_category": _top_n(by_category, n=len(by_category)),  # all categories
-        "by_ip": _top_n(by_ip),
-        "by_method": by_method,
-        "by_source": by_source,
-        "by_zone": by_zone,
-        "top_paths": _top_n(top_paths),
-        "latest_timestamp": latest_ts.isoformat() if latest_ts else None,
+        "total":            total,
+        "blocked":          blocked,
+        "alerts":           alerts,
+        "allowed":          allowed,
+        "blocked_by_ml":    blocked_by_ml,
+        "blocked_by_rule":  blocked_by_rule,
+        "by_category":      _top_n(by_category, n=len(by_category)),
+        "by_ip":            _top_n(by_ip),
+        "by_method":        by_method,
+        "by_source":        by_source,
+        "by_zone":          by_zone,
+        "top_paths":        _top_n(top_paths),
+        "latest_timestamp": latest_ts.strftime('%Y-%m-%d %H:%M:%S') if latest_ts else None,
     }
+
+
+def get_ip_stats(log_file: Path = _LOG_FILE) -> dict[str, dict]:
+    """Return per-IP counters: total requests, blocked attacks, and alerts."""
+    stats: dict[str, dict] = {}
+    for entry in iter_entries(log_file):
+        if not entry.ip:
+            continue
+        if entry.ip not in stats:
+            stats[entry.ip] = {"requests": 0, "attacks": 0, "alerts": 0}
+        stats[entry.ip]["requests"] += 1
+        if entry.status == "BLOCKED":
+            stats[entry.ip]["attacks"] += 1
+        elif entry.status == "ALERT":
+            stats[entry.ip]["alerts"] += 1
+    return stats
 
 
 def get_timeline(
@@ -419,10 +479,10 @@ def get_timeline(
     Returns
     -------
     List of dicts, each with keys:
-        bucket   — ISO-formatted bucket label (string),
-        blocked  — count of BLOCKED entries,
-        alerts   — count of ALERT entries,
-        allowed  — count of ALLOWED entries.
+        bucket   â€” ISO-formatted bucket label (string),
+        blocked  â€” count of BLOCKED entries,
+        alerts   â€” count of ALERT entries,
+        allowed  â€” count of ALLOWED entries.
     Sorted oldest-first, ready for direct use in Chart.js / ApexCharts datasets.
     """
     fmt_map = {

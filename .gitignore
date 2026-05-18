@@ -223,3 +223,4 @@ docs/changes_report.tex
 parsed_rules.json
 docs/rule_engine_doc.tex
 logs/feedback.jsonl
+.claude/settings.local.json

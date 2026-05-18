@@ -1,0 +1,704 @@
+{% extends "base.html" %}
+
+{% block page_title %}Event Logs{% endblock %}
+{% block header_title %}Event Logs{% endblock %}
+
+{% block content %}
+<div class="card-panel">
+  <div class="cp-hdr" style="gap:8px">
+    <!-- Live search -->
+    <input type="text" id="logs-search" class="form-control form-control-sm"
+           placeholder="Search logs..." style="flex:1;min-width:160px;max-width:320px"
+           oninput="DT && DT.search(this.value).draw()">
+
+    <!-- Filters toggle button -->
+    <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1"
+            id="filter-toggle-btn" type="button" onclick="toggleFilterPanel()">
+      <i class="bi bi-funnel"></i>Filters
+      <span class="badge bg-danger ms-1 d-none" id="filter-count-badge" style="font-size:10px;padding:2px 5px">0</span>
+    </button>
+
+    <!-- Rows per page -->
+    <input type="number" id="rows-per-page" class="form-control form-control-sm text-center"
+           value="25" min="1" max="500" style="width:64px" title="Rows per page"
+           onchange="if(DT){DT.page.len(Math.max(1,+this.value||25)).draw();}">
+
+    <!-- Export CSV -->
+    <button class="btn btn-sm btn-success d-flex align-items-center gap-1"
+            id="btn-export-csv" onclick="exportCsv()">
+      <i class="bi bi-file-earmark-excel"></i>Export CSV
+    </button>
+  </div>
+
+  <!-- Expanded filter panel (collapsible) -->
+  <div id="filter-panel" class="d-none" style="border-bottom:1px solid var(--border);background:#f8fafc;padding:14px 20px 12px">
+    <div class="row g-3">
+
+      <!-- STATUS -->
+      <div class="col-sm-6 col-xl-3">
+        <div class="filter-label">Status</div>
+        <div class="btn-group btn-group-sm w-100 mt-1" role="group" id="status-grp">
+          <button class="btn btn-outline-secondary active" onclick="filterStatus(this,null)">All</button>
+          <button class="btn btn-outline-danger"   onclick="filterStatus(this,'BLOCKED')">Blocked</button>
+          <button class="btn btn-outline-warning"  onclick="filterStatus(this,'ALERT')">Alert</button>
+          <button class="btn btn-outline-success"  onclick="filterStatus(this,'ALLOWED')">Allowed</button>
+        </div>
+      </div>
+
+      <!-- DETECTION SOURCE -->
+      <div class="col-sm-6 col-xl-3">
+        <div class="filter-label">Detection Source</div>
+        <div class="btn-group btn-group-sm w-100 mt-1" role="group" id="source-grp">
+          <button class="btn btn-outline-secondary active" onclick="filterSource(this,null)">All</button>
+          <button class="btn btn-outline-secondary" onclick="filterSource(this,'rule')">Rules</button>
+          <button class="btn btn-outline-secondary" onclick="filterSource(this,'ml')">ML</button>
+          <button class="btn btn-outline-secondary" onclick="filterSource(this,'anomaly')">Anomaly</button>
+        </div>
+      </div>
+
+      <!-- ATTACK CATEGORY -->
+      <div class="col-sm-6 col-xl-3">
+        <div class="filter-label">Attack Category</div>
+        <select class="form-select form-select-sm mt-1" id="cat-filter" onchange="applyLogFilters()">
+          <option value="">All categories</option>
+          <option value="sql_injection">SQL Injection</option>
+          <option value="SQLi">SQLi (ML label)</option>
+          <option value="xss">XSS</option>
+          <option value="XSS">XSS (ML label)</option>
+          <option value="lfi">LFI / Path Traversal</option>
+          <option value="rce">RCE / CMDi</option>
+          <option value="php_injection">PHP Injection</option>
+          <option value="java_attack">Java Attack</option>
+          <option value="General">General</option>
+        </select>
+      </div>
+
+      <!-- ML MODEL -->
+      <div class="col-sm-6 col-xl-3">
+        <div class="filter-label">ML Model</div>
+        <select class="form-select form-select-sm mt-1" id="model-filter" onchange="filterByModel(this.value)">
+          <option value="">All models</option>
+          <option value="Master_Model">Master Model</option>
+          <option value="LOF">LOF (Unsupervised)</option>
+          <option value="SQLi_Expert">SQLi Expert</option>
+          <option value="XSS_Expert">XSS Expert</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- Clear all -->
+    <div class="d-flex justify-content-end mt-2">
+      <button class="btn btn-sm btn-link text-danger p-0 d-none" id="clear-filters-btn"
+              onclick="clearAllFilters()" style="font-size:12px">
+        <i class="bi bi-x-circle me-1"></i>Clear all filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Active filter chips (IP) — hidden when empty -->
+  <div id="active-filters-bar" class="d-none px-3 pt-2 pb-1 d-flex gap-2 flex-wrap"
+       style="border-bottom:1px solid var(--border)">
+    <div id="ip-filter-chip"></div>
+  </div>
+
+  <div class="cp-body p-0 px-3 pb-3">
+    <table id="logs-tbl" class="table table-hover table-sm w-100">
+      <thead>
+        <tr>
+          <th>Timestamp</th><th>IP</th><th>Method</th><th>Path</th>
+          <th>Status</th><th>Category</th><th>Model</th>
+          <th>Score</th><th>Payload</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.filter-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--txt-2, #64748b);
+}
+#filter-panel .btn-group .btn {
+  font-size: 11px;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// LOG PAGE STATE
+let DT            = null;
+let activeStatus  = null;
+let activeSource  = null;
+let activeModel   = null;
+let activeStatusIn = null;
+let activeIp       = null;
+let refreshPromise = null;
+
+// LOG DETAIL MODAL STATE
+let _modalIp     = null;
+let _modalTs     = null;
+let _modalStatus = null;
+let _modalRow    = null;
+
+function splitModelNames(model) {
+  return String(model || '').split(/[,;+]/).map(s => s.trim()).filter(Boolean);
+}
+
+// DATATABLE INIT
+function initTable() {
+  DT = $('#logs-tbl').DataTable({
+    data: [],
+    columns: [
+      { data:'timestamp', render: d => `<span style="white-space:nowrap;font-size:11px">${esc(fmtTs(d))}</span>` },
+      { data:'ip',        render: d => `<code style="font-size:11px">${esc(d)}</code>` },
+      { data:'method',    render: d => `<span class="badge bg-light text-dark border" style="font-size:10px">${esc(d)}</span>` },
+      { data:'path',      render: d => `<span style="font-size:11px;max-width:180px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d)}</span>` },
+      { data:'status',    render: statusBadge },
+      { data:'category',  render: d => d ? `<span class="badge bg-light text-dark border" style="font-size:10px">${esc(attackLabel(d))}</span>` : '-' },
+      { data:'model',     render: d => d ? `<span style="color:#8b5cf6;font-size:11px">${esc(d)}</span>` : '-' },
+      { data:'score',     render: scoreCell },
+      { data:'payload',   render: d => d
+          ? `<span class="payload-tag" title="${esc(d)}">${esc(String(d).slice(0,55))}${String(d).length>55?'...':''}</span>`
+          : '<span class="text-muted">-</span>' },
+    ],
+    pageLength: 25,
+    order: [[0,'desc']],
+    columnDefs: [{ visible: false, targets: [2, 3, 6, 7, 8] }],
+    language: {
+      info: 'Showing _START_-_END_ of _TOTAL_ events',
+      emptyTable: 'No events found.',
+      search: '_INPUT_',
+      searchPlaceholder: '',
+    },
+    dom: 'rtip',
+  });
+
+  $('#logs-tbl tbody').on('click', 'tr', function() {
+    const row = DT.row(this).data();
+    if (row) openLogModal(row);
+  });
+}
+
+function renderTable(entries, options = {}) {
+  if (!DT) return;
+  const savedY       = window.scrollY;
+  const preservePage = options.preservePage !== false;
+  const currentPage  = preservePage ? DT.page() : 0;
+  DT.clear().rows.add(entries).draw(false);
+  if (preservePage) {
+    const info = DT.page.info();
+    const lastPage = Math.max(0, (info.pages || 1) - 1);
+    const targetPage = Math.min(currentPage, lastPage);
+    if (DT.page() !== targetPage) DT.page(targetPage).draw('page');
+  } else {
+    DT.page(0).draw('page');
+  }
+  requestAnimationFrame(() => window.scrollTo(0, savedY));
+}
+
+// FILTERS
+function logsUrl() {
+  const cat = (document.getElementById('cat-filter')?.value || '').trim();
+  let u = '/api/dashboard/logs?page=1&limit=200';
+  if (activeStatus)   u += `&log_status=${activeStatus}`;
+  if (activeStatusIn && activeStatusIn.length) u += `&status_in=${encodeURIComponent(activeStatusIn.join(','))}`;
+  if (activeSource)   u += `&source=${encodeURIComponent(activeSource)}`;
+  if (activeModel)    u += `&model=${encodeURIComponent(activeModel)}`;
+  if (cat)            u += `&category=${encodeURIComponent(cat)}`;
+  if (activeIp)       u += `&ip=${encodeURIComponent(activeIp)}`;
+  return u;
+}
+
+function applyClientLogFilters(entries = []) {
+  const cat = (document.getElementById('cat-filter')?.value || '').trim().toLowerCase();
+  let out = [...entries];
+  if (activeStatus)   out = out.filter(e => String(e.status||'') === activeStatus);
+  if (activeStatusIn && activeStatusIn.length) {
+    const allowed = new Set(activeStatusIn.map(s => String(s)));
+    out = out.filter(e => allowed.has(String(e.status||'')));
+  }
+  if (activeSource) out = out.filter(e => String(e.source||'').toLowerCase() === String(activeSource).toLowerCase());
+  if (activeModel) {
+    const model = String(activeModel).toLowerCase();
+    out = out.filter(e => splitModelNames(e.model).some(m => m.toLowerCase() === model));
+  }
+  if (cat)      out = out.filter(e => String(e.category||'').toLowerCase() === cat);
+  if (activeIp) out = out.filter(e => String(e.ip||'') === String(activeIp));
+  return out;
+}
+
+function logFilterKey() {
+  const cat = (document.getElementById('cat-filter')?.value || '').trim();
+  return JSON.stringify({
+    status: activeStatus || null,
+    statusIn: activeStatusIn ? [...activeStatusIn] : [],
+    source: activeSource || null,
+    model: activeModel || null,
+    category: cat || null,
+    ip: activeIp || null,
+  });
+}
+
+function updateFilterChips() {
+  const bar  = document.getElementById('active-filters-bar');
+  const chip = document.getElementById('ip-filter-chip');
+  if (!bar || !chip) return;
+  if (activeIp) {
+    chip.innerHTML = `
+      <span class="d-inline-flex align-items-center gap-1"
+            style="background:#dbeafe;color:#1d4ed8;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600">
+        <i class="bi bi-funnel-fill" style="font-size:10px"></i>
+        IP&nbsp;:&nbsp;<code style="font-size:11px;background:transparent;color:#1d4ed8">${esc(activeIp)}</code>
+        <button onclick="clearIpFilter()"
+                style="background:none;border:none;padding:0 0 0 4px;color:#1d4ed8;cursor:pointer;font-size:14px;line-height:1"
+                title="Clear IP filter">×</button>
+      </span>`;
+    bar.classList.remove('d-none');
+  } else {
+    chip.innerHTML = '';
+    bar.classList.add('d-none');
+  }
+}
+
+async function clearIpFilter() {
+  activeIp = null;
+  const url = new URL(window.location);
+  url.searchParams.delete('ip');
+  window.history.replaceState({}, '', url);
+  updateFilterChips();
+  await applyLogFilters();
+}
+
+async function filterStatus(btn, status) {
+  btn.closest('#status-grp').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeStatus   = status;
+  activeStatusIn = null;
+  await applyLogFilters();
+}
+
+async function filterSource(btn, source) {
+  btn.closest('#source-grp').querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeSource = source;
+  await applyLogFilters();
+}
+
+async function filterByModel(model) {
+  activeModel    = model || null;
+  activeStatusIn = model ? ['BLOCKED', 'ALERT'] : null;
+  await applyLogFilters();
+}
+
+function toggleFilterPanel() {
+  const panel = document.getElementById('filter-panel');
+  const btn   = document.getElementById('filter-toggle-btn');
+  if (!panel) return;
+  const isOpen = !panel.classList.contains('d-none');
+  panel.classList.toggle('d-none', isOpen);
+  if (btn) {
+    btn.classList.toggle('btn-secondary',         !isOpen);
+    btn.classList.toggle('btn-outline-secondary',  isOpen);
+  }
+}
+
+function updateFilterBadge() {
+  const cat   = (document.getElementById('cat-filter')?.value   || '').trim();
+  const model = (document.getElementById('model-filter')?.value || '').trim();
+  let count = 0;
+  if (activeStatus) count++;
+  if (activeSource) count++;
+  if (cat)          count++;
+  if (model)        count++;
+  if (activeIp)     count++;
+
+  const badge = document.getElementById('filter-count-badge');
+  if (badge) {
+    badge.textContent = count;
+    badge.classList.toggle('d-none', count === 0);
+  }
+  const clearBtn = document.getElementById('clear-filters-btn');
+  if (clearBtn) clearBtn.classList.toggle('d-none', count === 0);
+}
+
+async function clearAllFilters() {
+  activeStatus   = null;
+  activeSource   = null;
+  activeModel    = null;
+  activeStatusIn = null;
+  activeIp       = null;
+
+  const catEl = document.getElementById('cat-filter');
+  if (catEl) catEl.value = '';
+  const modelEl = document.getElementById('model-filter');
+  if (modelEl) modelEl.value = '';
+
+  syncStatusButtons(null);
+  syncSourceButtons(null);
+
+  const url = new URL(window.location);
+  url.searchParams.delete('ip');
+  window.history.replaceState({}, '', url);
+
+  updateFilterChips();
+  await applyLogFilters();
+}
+
+function syncSourceButtons(source) {
+  const grp = document.getElementById('source-grp');
+  if (!grp) return;
+  grp.querySelectorAll('.btn').forEach(b => {
+    const oc = b.getAttribute('onclick') || '';
+    const active =
+      (source === null    && oc.includes('filterSource(this,null)')) ||
+      (source === 'rule'  && oc.includes("'rule'"))   ||
+      (source === 'ml'    && oc.includes("'ml'"))     ||
+      (source === 'anomaly' && oc.includes("'anomaly'"));
+    b.classList.toggle('active', active);
+  });
+}
+
+function syncStatusButtons(status) {
+  const grp = document.getElementById('status-grp');
+  if (!grp) return;
+  grp.querySelectorAll('.btn').forEach(b => {
+    const onclick = b.getAttribute('onclick') || '';
+    const isActive =
+      (status === null   && onclick.includes("filterStatus(this,null)")) ||
+      (status === 'BLOCKED' && onclick.includes("'BLOCKED'")) ||
+      (status === 'ALERT'   && onclick.includes("'ALERT'"))   ||
+      (status === 'ALLOWED' && onclick.includes("'ALLOWED'"));
+    b.classList.toggle('active', isActive);
+  });
+}
+
+async function applyLogFilters() {
+  updateFilterBadge();
+  try {
+    const d = await get(logsUrl());
+    renderTable(applyClientLogFilters(d.entries || []), { preservePage: false });
+  } catch(e) { toast('Filter failed', 'danger'); }
+}
+
+// MAIN UPDATE
+async function updateDashboard() {
+  if (refreshPromise) return refreshPromise;
+  const logsKeyAtStart = logFilterKey();
+  refreshPromise = (async () => {
+    try {
+      const d = await get(logsUrl());
+      if (logsKeyAtStart === logFilterKey()) {
+        renderTable(applyClientLogFilters(d.entries || []), { preservePage: true });
+      }
+    } catch(e) {
+      console.error('Logs refresh error:', e);
+    }
+  })();
+  try { await refreshPromise; } finally { refreshPromise = null; }
+}
+
+// LOG DETAIL MODAL
+function openLogModal(row) {
+  _modalIp     = row.ip;
+  _modalTs     = row.timestamp;
+  _modalStatus = row.status;
+  _modalRow    = row;
+
+  const scMap = {BLOCKED:'danger', ALERT:'warning', ALLOWED:'success'};
+  const sc  = scMap[row.status] || 'secondary';
+  const pct = row.score ? Math.round(row.score * 100) : 0;
+  const barCls = pct >= 80 ? 'bg-danger' : pct >= 50 ? 'bg-warning' : 'bg-secondary';
+
+  const scoreFields = [];
+  if (row.master_score != null) scoreFields.push(['Master', row.master_score]);
+  if (row.lof_score    != null) scoreFields.push(['LOF',    row.lof_score]);
+
+  const sqliV = row.sqli_score != null ? Number(row.sqli_score) : null;
+  const xssV  = row.xss_score  != null ? Number(row.xss_score)  : null;
+  if (sqliV != null) scoreFields.push(['Expert (SQLi)', sqliV]);
+  if (xssV  != null) scoreFields.push(['Expert (XSS)',  xssV]);
+  if (row.hybrid_score != null) scoreFields.push(['Hybrid (Master+LOF+Expert)/3', row.hybrid_score]);
+
+  const scoreRows = scoreFields
+    .filter(([, v]) => v != null && !Number.isNaN(Number(v)))
+    .map(([k, v]) => `
+      <div class="d-flex justify-content-between py-1" style="border-bottom:1px dashed #e2e8f0">
+        <span style="font-size:12px;color:var(--txt-2)">${esc(k)}</span>
+        <span style="font-family:monospace;font-size:12px;font-weight:600">${(Number(v)*100).toFixed(2)}%</span>
+      </div>`)
+    .join('');
+
+  const scoreDetailsHtml = scoreRows
+    ? `<div class="col-12"><div class="modal-field"><div class="mf-label">Model Scores (Detailed)</div><div class="mf-value">${scoreRows}</div></div></div>`
+    : '';
+
+  const detectionVerb = row.status === 'ALERT' ? 'Alerted by' : 'Detected by';
+  const rowModels = splitModelNames(row.model);
+  let detectionText = '';
+  if (row.source === 'rule') {
+    detectionText = `${detectionVerb}: Rule engine`;
+  } else if (row.source === 'anomaly' || row.source === 'ml' || (rowModels.length >= 1 && rowModels[0] === 'LOF')) {
+    detectionText = `${detectionVerb}: Machine learning engine`;
+  } else {
+    detectionText = row.reason || '-';
+  }
+
+  document.getElementById('modal-hdr').className = `modal-header border-bottom border-${sc} border-2`;
+
+  document.getElementById('modal-body').innerHTML = `
+  <div class="row g-2">
+    <div class="col-sm-6">
+      <div class="modal-field"><div class="mf-label">Timestamp</div><div class="mf-value">${esc(fmtTs(row.timestamp))}</div></div>
+    </div>
+    <div class="col-sm-6">
+      <div class="modal-field"><div class="mf-label">Status</div><div class="mf-value">${statusBadge(row.status)}</div></div>
+    </div>
+    <div class="col-sm-6">
+      <div class="modal-field"><div class="mf-label">IP Address</div><div class="mf-value"><code style="font-size:13px">${esc(row.ip)}</code></div></div>
+    </div>
+    <div class="col-sm-3">
+      <div class="modal-field"><div class="mf-label">Method</div><div class="mf-value"><span class="badge bg-light text-dark border">${esc(row.method)}</span></div></div>
+    </div>
+    <div class="col-sm-3">
+      <div class="modal-field"><div class="mf-label">Category</div><div class="mf-value">
+        ${row.category ? `<span class="badge bg-light text-dark border">${esc(attackLabel(row.category))}</span>` : '-'}
+      </div></div>
+    </div>
+    <div class="col-12">
+      <div class="modal-field"><div class="mf-label">Path</div><div class="mf-value"><code style="word-break:break-all;font-size:12px">${esc(row.path)}</code></div></div>
+    </div>
+    <div class="col-sm-6">
+      <div class="modal-field"><div class="mf-label">ML Model</div><div class="mf-value">
+        ${row.model ? `<span style="color:#8b5cf6;font-weight:600">${esc(row.model)}</span>` : '<span class="text-muted">-</span>'}
+      </div></div>
+    </div>
+    <div class="col-sm-6">
+      <div class="modal-field"><div class="mf-label">Confidence Score</div><div class="mf-value">
+        ${pct > 0 ? `
+          <div class="d-flex align-items-center gap-2">
+            <div class="progress flex-grow-1" style="height:8px;border-radius:4px;background:#e2e8f0">
+              <div class="progress-bar ${barCls}" style="width:${pct}%;border-radius:4px;transition:width .5s ease"></div>
+            </div>
+            <span class="fw-bold" style="min-width:36px;font-size:13px">${pct}%</span>
+          </div>` : '<span class="text-muted">-</span>'}
+      </div></div>
+    </div>
+    ${scoreDetailsHtml}
+    <div class="col-12">
+      <div class="modal-field"><div class="mf-label">Reason / Detection</div><div class="mf-value">${esc(detectionText)||'<span class="text-muted">-</span>'}</div></div>
+    </div>
+    <div class="col-12">
+      <div class="modal-field"><div class="mf-label">Payload <span style="font-weight:400;color:var(--txt-2)">(full)</span></div><div class="mf-value">
+        ${row.payload
+          ? `<code style="display:block;background:#fef2f2;color:#dc2626;padding:10px 12px;border-radius:6px;font-size:12px;word-break:break-all;white-space:pre-wrap;max-height:160px;overflow-y:auto">${esc(row.payload)}</code>`
+          : '<span class="text-muted">-</span>'}
+      </div></div>
+    </div>
+  </div>`;
+
+  new bootstrap.Modal(document.getElementById('log-modal')).show();
+}
+
+async function blockIpFromModal() {
+  if (!_modalIp) return;
+  const btn = document.getElementById('modal-block-btn');
+  btn.disabled = true;
+  try {
+    await post('/api/dashboard/blacklist', {ip: _modalIp});
+    toast(_modalIp + ' blocked', 'danger');
+    bootstrap.Modal.getInstance(document.getElementById('log-modal'))?.hide();
+  } catch(e) {
+    toast('Block failed: ' + e.message, 'danger');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// FEEDBACK
+function openFeedbackModal() {
+  if (!_modalRow) return;
+  renderFeedbackModal(_modalStatus);
+  const logModal = bootstrap.Modal.getInstance(document.getElementById('log-modal'));
+  if (logModal) {
+    logModal.hide();
+    document.getElementById('log-modal').addEventListener('hidden.bs.modal', () => {
+      new bootstrap.Modal(document.getElementById('feedback-modal')).show();
+    }, { once: true });
+  } else {
+    new bootstrap.Modal(document.getElementById('feedback-modal')).show();
+  }
+}
+
+function renderFeedbackModal(status) {
+  const isBlocked = status === 'BLOCKED';
+  const primary = isBlocked
+    ? [
+        { val:'TP', label:'True Positive',  icon:'bi-check-circle-fill', cls:'success', desc:'Will be added to the dataset as ATTACK example' },
+        { val:'FP', label:'False Positive', icon:'bi-x-circle-fill',     cls:'danger',  desc:'Will be added to the dataset as NORMAL example' },
+      ]
+    : [
+        { val:'TN', label:'True Negative',  icon:'bi-check-circle',             cls:'primary', desc:'Will be added to the dataset as NORMAL example' },
+        { val:'FN', label:'False Negative', icon:'bi-exclamation-circle-fill',  cls:'warning', desc:'Will be added to the dataset as ATTACK example' },
+      ];
+
+  const secondary = isBlocked
+    ? [
+        { val:'TN', label:'TN (True Negative)',  icon:'bi-check-circle' },
+        { val:'FN', label:'FN (False Negative)', icon:'bi-exclamation-circle' },
+      ]
+    : [
+        { val:'TP', label:'TP (True Positive)', icon:'bi-check-circle-fill' },
+        { val:'FP', label:'FP (False Positive)', icon:'bi-x-circle-fill' },
+      ];
+
+  const statusLabel = { BLOCKED:'BLOCKED', ALLOWED:'ALLOWED', ALERT:'ALERT' }[status] || status;
+  const legend = isBlocked
+    ? `WAF decision&nbsp;: <span class="badge bg-danger">${statusLabel}</span> → confirm if the attack is real (TP) or correct as error (FP)`
+    : `WAF decision&nbsp;: <span class="badge bg-${status==='ALERT'?'warning':'success'}">${statusLabel}</span> → confirm if request is normal (TN) or report missed attack (FN)`;
+
+  const primaryHtml = primary.map(b => `
+    <div class="col-6">
+      <button class="btn btn-${b.cls} w-100 py-2 d-flex flex-column align-items-center gap-1" onclick="sendFeedback('${b.val}')">
+        <i class="bi ${b.icon}" style="font-size:1.3rem"></i>
+        <span style="font-weight:600;font-size:13px">${b.label} (${b.val})</span>
+        <small style="font-size:10px;opacity:.85;line-height:1.3">${b.desc}</small>
+      </button>
+    </div>`).join('');
+
+  const secondaryHtml = secondary.map(b => `
+    <div class="col-6">
+      <button class="btn btn-outline-secondary w-100 py-1" style="opacity:.6;font-size:12px" onclick="sendFeedback('${b.val}')">
+        <i class="bi ${b.icon} me-1"></i>${b.label}
+      </button>
+    </div>`).join('');
+
+  document.getElementById('feedback-modal-body').innerHTML = `
+    <p style="font-size:13px;margin-bottom:14px">${legend}</p>
+    <div class="row g-2 mb-3">${primaryHtml}</div>
+    <div style="font-size:11px;color:var(--txt-2);margin-bottom:8px">Other options:</div>
+    <div class="row g-2 mb-3">${secondaryHtml}</div>
+    <div style="font-size:11px;color:var(--txt-2);line-height:1.8;border-top:1px solid var(--border);padding-top:10px">
+      <strong>TP</strong> = attack correctly blocked &nbsp;
+      <strong>FP</strong> = normal request blocked by mistake<br>
+      <strong>TN</strong> = normal request correctly allowed &nbsp;
+      <strong>FN</strong> = attack not detected
+    </div>`;
+}
+
+async function sendFeedback(validation) {
+  if (!_modalRow) { toast('No event selected', 'warning'); return; }
+  const payload = {
+    request_str:     _modalRow.payload || _modalRow.path || '',
+    original_status: _modalRow.status  || '',
+    validation,
+    ip:              _modalRow.ip       || '',
+    path:            _modalRow.path     || '',
+    payload:         _modalRow.payload  || '',
+    model:           _modalRow.model    || '',
+    attack_type:     _modalRow.category || '',
+    score:           _modalRow.score    || 0,
+  };
+  try {
+    await post('/api/dashboard/feedback/direct', payload);
+    bootstrap.Modal.getInstance(document.getElementById('feedback-modal'))?.hide();
+    toast('<i class="bi bi-check-circle me-1"></i>Feedback saved → included in next retraining', 'success', true);
+    // Update corrections badge
+    try {
+      const s = await get('/api/dashboard/feedback/stats');
+      const cb = document.getElementById('corrections-badge');
+      if (cb) cb.textContent = s.validated ?? 0;
+    } catch(e) {}
+  } catch(e) {
+    toast('Feedback error: ' + e.message, 'danger');
+  }
+}
+
+// EXPORT CSV
+async function exportCsv() {
+  const btn = document.getElementById('btn-export-csv');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" style="border-top-color:#2563eb;border-color:#c7d2fe"></span> Exporting...'; }
+  try {
+    const cat = (document.getElementById('cat-filter')?.value || '').trim();
+    let url = '/api/dashboard/logs?page=1&limit=10000';
+    if (activeStatus)   url += `&log_status=${activeStatus}`;
+    if (activeStatusIn && activeStatusIn.length) url += `&status_in=${encodeURIComponent(activeStatusIn.join(','))}`;
+    if (activeSource)   url += `&source=${encodeURIComponent(activeSource)}`;
+    if (activeModel)    url += `&model=${encodeURIComponent(activeModel)}`;
+    if (cat)            url += `&category=${encodeURIComponent(cat)}`;
+
+    const data    = await get(url);
+    const entries = data.entries || [];
+    const COLS = ['Timestamp','IP','Method','Path','Status','Category','Model','Score','Payload'];
+    const rows = entries.map(e => [
+      fmtTs(e.timestamp), e.ip||'', e.method||'', e.path||'', e.status||'',
+      e.category ? attackLabel(e.category) : '',
+      e.model||'', e.score ? (e.score*100).toFixed(1)+'%' : '', e.payload||'',
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+
+    const csv  = [COLS.join(','), ...rows].join('\r\n');
+    const blob = new Blob(['﻿' + csv], {type:'text/csv;charset=utf-8'});
+    const href = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), {
+      href, download: `waf_logs_${new Date().toISOString().slice(0,10)}.csv`
+    });
+    a.click();
+    URL.revokeObjectURL(href);
+    toast(`Exported ${entries.length} events`, 'success');
+  } catch(e) {
+    toast('Export failed: ' + e.message, 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-excel"></i>Export CSV'; }
+  }
+}
+
+// INIT — parse URL params (for cross-page navigation from IP Manager / Overview / ML Models)
+document.addEventListener('DOMContentLoaded', async () => {
+  initTable();
+  const params = new URLSearchParams(window.location.search);
+  const filter = params.get('filter');
+  const model  = params.get('model');
+  const ip     = params.get('ip');
+
+  if (ip) {
+    activeIp = ip;
+  }
+
+  if (model) {
+    activeModel    = model;
+    activeStatusIn = ['BLOCKED', 'ALERT'];
+    activeStatus   = null;
+    activeSource   = null;
+  } else if (filter === 'blocked') {
+    activeStatus = 'BLOCKED'; activeSource = null;
+  } else if (filter === 'alerts') {
+    activeStatus = 'ALERT'; activeSource = null;
+  } else if (filter === 'allowed') {
+    activeStatus = 'ALLOWED'; activeSource = null;
+  } else if (filter === 'rules') {
+    activeStatus = 'BLOCKED'; activeSource = 'rule';
+  } else if (filter === 'ml') {
+    activeStatus = 'BLOCKED'; activeSource = 'ml';
+  }
+
+  syncStatusButtons(activeStatus);
+  syncSourceButtons(activeSource);
+  if (activeModel) {
+    const modelEl = document.getElementById('model-filter');
+    if (modelEl) modelEl.value = activeModel;
+  }
+  updateFilterChips();
+  updateFilterBadge();
+  await updateDashboard();
+  startAutoRefresh();
+});
+</script>
+{% endblock %}

@@ -20,7 +20,7 @@ class FeedbackCollector:
         """Enregistre chaque décision ML dans le fichier feedback"""
         entry = {
             'id': str(uuid.uuid4()),
-            'timestamp': datetime.now().isoformat(),
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'client_ip': client_ip,
             'request': request_str[:500],
             'prediction': prediction,
@@ -66,7 +66,7 @@ class FeedbackCollector:
                         entry = json.loads(line)
                         if entry.get('id') == entry_id:
                             entry['admin_validation'] = validation
-                            entry['validation_date'] = datetime.now().isoformat()
+                            entry['validation_date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                             found = True
                         entries.append(entry)
         except FileNotFoundError:
@@ -85,7 +85,7 @@ class FeedbackCollector:
         Utilisé par le feedback direct depuis le dashboard (waf.log → feedback.jsonl).
         Retourne l'UUID de l'entrée créée.
         """
-        now = datetime.now().isoformat()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         entry = {
             'id':               str(uuid.uuid4()),
             'timestamp':        now,

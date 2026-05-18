@@ -3,8 +3,12 @@
     "127.0.0.1"
   ],
   "blacklist": [],
-  "ip_scores": {},
-  "ip_offenses": {},
+  "ip_scores": {
+    "192.168.3.98": 0
+  },
+  "ip_offenses": {
+    "192.168.3.98": 0
+  },
   "ip_blocked_until": {},
-  "updated_at": "2026-05-10T23:46:31.511007"
+  "updated_at": "2026-05-18 03:35:19"
 }

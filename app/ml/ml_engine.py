@@ -14,12 +14,12 @@ class MLDetectionEngine:
         self.isolation_forest = None
         self.feature_extractor = FeatureExtractor()
 
-        # Production-oriented decision thresholds
-        self.hard_block_th = 0.90
-        self.lof_hard_th = 0.95
-        self.support_th = 0.55
-        self.ensemble_block_th = 0.75
-        self.ensemble_alert_th = 0.45
+        # Decision thresholds
+        self.normal_th           = 0.50   # below → normal (no alert)
+        self.attack_th           = 0.80   # combined(LOF+Master) → hard block
+        self.expert_attack_th    = 0.70   # expert alone → block in grey zone
+        self.category_confirm_th = 0.60   # expert score needed to confirm category in hard block
+        self.alert_category_th   = 0.50   # expert score needed to label category in alerts
 
     def load_models(self):
         self.sqli_model = joblib.load(f'{self.models_path}/sqli_expert_model.pkl')
@@ -112,70 +112,78 @@ class MLDetectionEngine:
 
     def detect_attack(self, request):
         """
-        Ensemble decision flow (all models evaluated in parallel):
-        1) Hard block if:
-           - expert >= 0.90, or
-           - master >= 0.90, or
-           - lof >= 0.95 and (master >= 0.55 or expert >= 0.55)
-        2) Otherwise compute equal-weight ensemble:
-           ensemble = (master + lof + expert) / 3
-           - ensemble >= 0.75 => block
-           - 0.45 <= ensemble < 0.75 => alert
-           - else => allow
+        Full pipeline: all four models always run.
 
-        LOF-only spikes (high LOF without support) generate alert, not block.
+        Hard blocks (LOF+Master combined high) pass through the expert models
+        for category confirmation.  The returned `model` field lists every model
+        that contributed to the decision so dashboards can display it accurately.
+
+        Return tuple: (is_attack, score, zone, model, attack_type, details)
+          zone values: 'attack' | 'grey_zone_normal' | 'normal'
         """
         master_score = self.detect_master(request)
-        lof_score = self.detect_anomaly_score(request)
-        sqli_score = self.detect_sqli(request)
-        xss_score = self.detect_xss(request)
-        expert_score = max(sqli_score, xss_score)
+        lof_score    = self.detect_anomaly_score(request)
+        sqli_score   = self.detect_sqli(request)
+        xss_score    = self.detect_xss(request)
 
-        if sqli_score >= xss_score:
-            attack_type = 'SQLi'
-            expert_model = 'SQLi_Expert'
+        combined_score = (master_score + lof_score) / 2.0
+
+        # Context-aware primary expert selection
+        req_lc = request.lower()
+        if '/xss' in req_lc:
+            expert_score, attack_type, expert_model = xss_score, 'XSS',  'XSS_Expert'
+        elif '/sqli' in req_lc:
+            expert_score, attack_type, expert_model = sqli_score, 'SQLi', 'SQLi_Expert'
+        elif sqli_score >= xss_score:
+            expert_score, attack_type, expert_model = sqli_score, 'SQLi', 'SQLi_Expert'
         else:
-            attack_type = 'XSS'
-            expert_model = 'XSS_Expert'
-
-        ensemble_score = (master_score + lof_score + expert_score) / 3.0
+            expert_score, attack_type, expert_model = xss_score,  'XSS',  'XSS_Expert'
 
         details = {
-            'master_score': master_score,
-            'lof_score': lof_score,
-            # Keep "combined_score" for dashboard backward compatibility:
-            # it now represents the equal-weight ensemble score.
-            'combined_score': ensemble_score,
-            'expert_score': expert_score,
-            'sqli_score': sqli_score,
-            'xss_score': xss_score,
-            'hybrid_score': None,
+            'master_score':   master_score,
+            'lof_score':      lof_score,
+            'combined_score': combined_score,
+            'expert_score':   expert_score,
+            'sqli_score':     sqli_score,
+            'xss_score':      xss_score,
+            'hybrid_score':   (master_score + lof_score + expert_score) / 3.0,
         }
 
-        # 1) Hard blockers
-        if expert_score >= self.hard_block_th:
+        # ── Hard block: LOF + Master combined score is high ──────────────
+        if combined_score >= self.attack_th:
+            blocking_models = ['Master_Model', 'LOF']
+            # Try to confirm attack category via experts
+            best_expert = max(sqli_score, xss_score)
+            if best_expert >= self.category_confirm_th:
+                if sqli_score >= xss_score:
+                    blocking_models.append('SQLi_Expert')
+                    category = 'SQLi'
+                else:
+                    blocking_models.append('XSS_Expert')
+                    category = 'XSS'
+            else:
+                category = 'General'
+            return True, combined_score, 'attack', '+'.join(blocking_models), category, details
+
+        # ── Normal: clearly not an attack ────────────────────────────────
+        if combined_score < self.normal_th:
+            return False, combined_score, 'normal', '', '', details
+
+        # ── Grey zone: expert decides ─────────────────────────────────────
+        if expert_score >= self.expert_attack_th:
+            # Expert confirms attack with specific category
             return True, expert_score, 'attack', expert_model, attack_type, details
 
-        if master_score >= self.hard_block_th:
-            return True, master_score, 'attack', 'Master_Model', 'General', details
-
-        lof_supported = (
-            lof_score >= self.lof_hard_th and
-            (master_score >= self.support_th or expert_score >= self.support_th)
-        )
-        if lof_supported:
-            return True, lof_score, 'attack', 'LOF+Support', 'Anomaly', details
-
-        # 2) Equal-weight ensemble decision
-        if ensemble_score >= self.ensemble_block_th:
-            return True, ensemble_score, 'attack', 'Ensemble', attack_type, details
-
-        # LOF alone can still raise alert even if ensemble is low.
-        if lof_score >= self.lof_hard_th:
-            return False, lof_score, 'grey_zone_normal', 'LOF', 'Anomaly', details
-
-        if ensemble_score >= self.ensemble_alert_th:
-            return False, ensemble_score, 'grey_zone_normal', 'Ensemble', attack_type, details
-
-        return False, ensemble_score, 'normal', '', '', details
+        # ── Alert: suspicious but not confirmed ───────────────────────────
+        # Model field reflects which individual models drove the alert, not the expert.
+        alert_models = []
+        if master_score >= self.normal_th:
+            alert_models.append('Master_Model')
+        if lof_score >= self.normal_th:
+            alert_models.append('LOF')
+        if expert_score >= self.alert_category_th:
+            alert_models.append(expert_model)
+        alert_type  = attack_type if expert_score >= self.alert_category_th else 'General'
+        alert_model = '+'.join(alert_models) if alert_models else expert_model
+        return False, combined_score, 'grey_zone_normal', alert_model, alert_type, details
 

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block page_title %}ML Models{% endblock %}
+{% block header_title %}ML Models{% endblock %}
+
+{% block content %}
+<!-- ML model cards (filled by JS) -->
+<div class="row g-3 mb-4" id="ml-cards"></div>
+
+<!-- Detection score comparison chart -->
+<div class="card-panel">
+  <div class="cp-hdr">
+    <span class="cp-title">
+      <i class="bi bi-bar-chart-steps me-1 text-primary"></i>Detection Score Comparison
+    </span>
+  </div>
+  <div class="cp-body" style="min-height:300px">
+    <canvas id="ch-ml-detail"></canvas>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CH = {};
+let lastMlCardsSig = '';
+let refreshPromise = null;
+
+const ML_META = {
+  SQLi_Expert  : { icon:'bi-database-fill-exclamation', color:'#0d6efd', bg:'#eff6ff', label:'SQLi Expert',  type:'Supervised - XGBoost'        },
+  XSS_Expert   : { icon:'bi-code-slash',                color:'#fd7e14', bg:'#fff7ed', label:'XSS Expert',   type:'Supervised - Random Forest'  },
+  Master_Model : { icon:'bi-diagram-3-fill',            color:'#6f42c1', bg:'#f5f3ff', label:'Master Model', type:'Ensemble Voting'              },
+  LOF          : { icon:'bi-search',                    color:'#0dcaf0', bg:'#ecfeff', label:'LOF Anomaly',  type:'Unsupervised - LOF'           },
+};
+
+function initMlDetailChart() {
+  CH.mlDetail = new Chart(document.getElementById('ch-ml-detail'), {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [{ label:'Detections', data:[], backgroundColor:C.blue, borderRadius:5 }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{ legend:{ labels:{ boxWidth:11, font:{size:11} } } },
+      scales:{
+        y:{ beginAtZero:true, ticks:{font:{size:10}}, title:{display:true, text:'Detections', font:{size:10}} }
+      }
+    }
+  });
+}
+
+function renderMLCards(data) {
+  const sig = JSON.stringify(data || {});
+  if (sig === lastMlCardsSig) return;
+  lastMlCardsSig = sig;
+
+  const all = [...new Set([...Object.keys(ML_META), ...Object.keys(data)])];
+  document.getElementById('ml-cards').innerHTML = all.map(name => {
+    const m = ML_META[name] || {icon:'bi-cpu', color:'#64748b', bg:'#f8fafc', label:name, type:'ML Model'};
+    const d = data[name]    || {detections:0, avg_score:0};
+    const pct = Math.round((d.avg_score||0)*100);
+    const bar = pct >= 80 ? C.blocked : pct >= 50 ? C.alerts : C.blue;
+    const alertsHtml = d.alerts !== undefined
+      ? `<div class="col-6">
+           <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.5px">Alerts</div>
+           <div style="font-size:22px;font-weight:800;color:${C.alerts}">${d.alerts}</div>
+         </div>` : '';
+    return `
+    <div class="col-xl-3 col-md-6">
+      <div class="model-card" role="button" tabindex="0"
+           onpointerdown='openLogsFromModel(${JSON.stringify(name)})'
+           onkeydown='if(event.key==="Enter"||event.key===" ")openLogsFromModel(${JSON.stringify(name)})'>
+        <div class="model-ico" style="background:${m.bg}">
+          <i class="bi ${m.icon}" style="font-size:2rem;color:${m.color}"></i>
+        </div>
+        <div class="model-name">${esc(m.label)}</div>
+        <div class="model-type">${m.type}</div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.5px">Detections</div>
+            <div style="font-size:22px;font-weight:800;color:${m.color}">${d.detections}</div>
+          </div>
+          ${alertsHtml}
+        </div>
+        <div style="font-size:11px;color:var(--txt-2);margin-bottom:5px">
+          Avg confidence: <strong style="color:${bar}">${pct}%</strong>
+        </div>
+        <div class="progress" style="height:5px;border-radius:3px;background:#e2e8f0">
+          <div class="progress-bar" style="width:${pct}%;background:${bar};border-radius:3px;transition:width .6s ease"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderMlDetailChart(data) {
+  const names = Object.keys(data);
+  CH.mlDetail.data.labels           = names;
+  CH.mlDetail.data.datasets[0].data = names.map(n => data[n].detections ?? 0);
+  CH.mlDetail.update('none');
+}
+
+async function updateDashboard() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const data = await get('/api/dashboard/models-stats');
+      renderMLCards(data);
+      renderMlDetailChart(data);
+      requestAnimationFrame(() => CH.mlDetail?.resize());
+    } catch(e) {
+      console.error('ML Models refresh error:', e);
+    }
+  })();
+  try { await refreshPromise; } finally { refreshPromise = null; }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  initMlDetailChart();
+  await updateDashboard();
+  startAutoRefresh();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block page_title %}Overview{% endblock %}
+{% block header_title %}Overview{% endblock %}
+
+{% block content %}
+<!-- KPI row -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="kpi kpi-blue" role="button" tabindex="0"
+         onclick="openLogsFromKpi('total')"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openLogsFromKpi('total')">
+      <div class="kpi-ico"><i class="bi bi-activity"></i></div>
+      <div class="kpi-val" id="k-total">-</div>
+      <div class="kpi-lbl">Total Requests</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="kpi kpi-red" role="button" tabindex="0"
+         onclick="openLogsFromKpi('blocked')"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openLogsFromKpi('blocked')">
+      <div class="kpi-ico"><i class="bi bi-slash-circle"></i></div>
+      <div class="kpi-val" id="k-blocked">-</div>
+      <div class="kpi-lbl">Blocked</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="kpi kpi-orange" role="button" tabindex="0"
+         onclick="openLogsFromKpi('alerts')"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openLogsFromKpi('alerts')">
+      <div class="kpi-ico"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="kpi-val" id="k-alerts">-</div>
+      <div class="kpi-lbl">Alerts</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="kpi kpi-green" role="button" tabindex="0"
+         onclick="openLogsFromKpi('allowed')"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openLogsFromKpi('allowed')">
+      <div class="kpi-ico"><i class="bi bi-check-circle"></i></div>
+      <div class="kpi-val" id="k-allowed">-</div>
+      <div class="kpi-lbl">Allowed</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="kpi kpi-purple" role="button" tabindex="0"
+         onclick="openLogsFromKpi('rules')"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openLogsFromKpi('rules')">
+      <div class="kpi-ico"><i class="bi bi-funnel"></i></div>
+      <div class="kpi-val" id="k-rules">-</div>
+      <div class="kpi-lbl">Blocked by Rules</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-sm-6">
+    <div class="kpi kpi-cyan" role="button" tabindex="0"
+         onclick="openLogsFromKpi('ml')"
+         onkeydown="if(event.key==='Enter'||event.key===' ')openLogsFromKpi('ml')">
+      <div class="kpi-ico"><i class="bi bi-robot"></i></div>
+      <div class="kpi-val" id="k-ml">-</div>
+      <div class="kpi-lbl">Blocked by ML</div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts row 1: Pie + Line -->
+<div class="row g-3 mb-3">
+  <div class="col-xl-4 col-lg-5">
+    <div class="card-panel h-100">
+      <div class="cp-hdr">
+        <span class="cp-title">
+          <i class="bi bi-pie-chart me-1 text-primary"></i>Attacks by Type
+        </span>
+      </div>
+      <div class="cp-body d-flex align-items-center justify-content-center" style="min-height:270px">
+        <canvas id="ch-pie"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-8 col-lg-7">
+    <div class="card-panel h-100">
+      <div class="cp-hdr">
+        <span class="cp-title">
+          <i class="bi bi-graph-up me-1 text-primary"></i>Event Timeline
+        </span>
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn btn-outline-secondary interval-btn active" onclick="changeInterval(this,'hour')">Hour</button>
+          <button class="btn btn-outline-secondary interval-btn" onclick="changeInterval(this,'minute')">Min</button>
+          <button class="btn btn-outline-secondary interval-btn" onclick="changeInterval(this,'day')">Day</button>
+        </div>
+      </div>
+      <div class="cp-body" style="min-height:270px">
+        <canvas id="ch-line"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts row 2: Top IPs + Models -->
+<div class="row g-3">
+  <div class="col-xl-6">
+    <div class="card-panel h-100">
+      <div class="cp-hdr">
+        <span class="cp-title">
+          <i class="bi bi-geo-alt me-1 text-danger"></i>Top 10 Attacking IPs
+        </span>
+      </div>
+      <div class="cp-body" style="min-height:260px">
+        <canvas id="ch-ips"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-6">
+    <div class="card-panel h-100">
+      <div class="cp-hdr">
+        <span class="cp-title">
+          <i class="bi bi-bar-chart me-1 text-primary"></i>ML Models Detections
+        </span>
+      </div>
+      <div class="cp-body" style="min-height:260px">
+        <canvas id="ch-models"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CH = {};
+let activeInterval = 'hour';
+let refreshPromise = null;
+
+function initCharts() {
+  CH.pie = new Chart(document.getElementById('ch-pie'), {
+    type: 'doughnut',
+    data: { labels:[], datasets:[{data:[], backgroundColor:C.cats, borderWidth:2, borderColor:'#fff', hoverOffset:6}] },
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{
+        legend:{ position:'right', labels:{ boxWidth:11, font:{size:11}, padding:10 } },
+        tooltip:{ callbacks:{ label: ctx => ` ${ctx.label}: ${ctx.parsed} events` }},
+      }
+    }
+  });
+
+  CH.line = new Chart(document.getElementById('ch-line'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label:'Blocked', data:[], borderColor:C.blocked, backgroundColor:'rgba(239,68,68,.10)', fill:true, tension:.35, pointRadius:3 },
+        { label:'Alerts',  data:[], borderColor:C.alerts,  backgroundColor:'rgba(249,115,22,.08)', fill:true, tension:.35, pointRadius:3 },
+        { label:'Allowed', data:[], borderColor:C.allowed, backgroundColor:'rgba(34,197,94,.06)', fill:true, tension:.35, pointRadius:3 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{ legend:{ labels:{ boxWidth:11, font:{size:11} } } },
+      scales:{
+        x:{ ticks:{ font:{size:10}, maxTicksLimit:14, maxRotation:0 } },
+        y:{ beginAtZero:true, ticks:{ font:{size:10}, stepSize:1 } }
+      }
+    }
+  });
+
+  CH.ips = new Chart(document.getElementById('ch-ips'), {
+    type: 'bar',
+    data: { labels:[], datasets:[{label:'Events', data:[], backgroundColor:C.blocked, borderRadius:4, borderSkipped:false}] },
+    options: {
+      indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ beginAtZero:true, ticks:{font:{size:10}} },
+        y:{ ticks:{ font:{size:11} } }
+      }
+    }
+  });
+
+  CH.models = new Chart(document.getElementById('ch-models'), {
+    type: 'bar',
+    data: { labels:[], datasets:[{label:'Detections', data:[], backgroundColor:C.blue, borderRadius:5, borderSkipped:false}] },
+    options: {
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{font:{size:11}} },
+        y:{ beginAtZero:true, ticks:{font:{size:10}, stepSize:1} }
+      }
+    }
+  });
+}
+
+function renderKpis(s) {
+  document.getElementById('k-total').textContent   = s.total   ?? '-';
+  document.getElementById('k-blocked').textContent = s.blocked ?? '-';
+  document.getElementById('k-alerts').textContent  = s.alerts  ?? '-';
+  document.getElementById('k-allowed').textContent = s.allowed ?? '-';
+  document.getElementById('k-rules').textContent   = s.blocked_by_rules ?? '-';
+  document.getElementById('k-ml').textContent      = s.blocked_by_ml    ?? '-';
+  const b = document.getElementById('badge-total');
+  if (b) b.textContent = s.total ?? '0';
+}
+
+function renderPie(data) {
+  CH.pie.data.labels           = Object.keys(data).map(attackLabel);
+  CH.pie.data.datasets[0].data = Object.values(data);
+  CH.pie.update('none');
+}
+
+function renderLine(data) {
+  CH.line.data.labels           = data.map(b => b.bucket.replace('T',' ').slice(5));
+  CH.line.data.datasets[0].data = data.map(b => b.blocked);
+  CH.line.data.datasets[1].data = data.map(b => b.alerts);
+  CH.line.data.datasets[2].data = data.map(b => b.allowed);
+  CH.line.update('none');
+}
+
+function renderIpsChart(data) {
+  const pairs = Object.entries(data).slice(0, 10);
+  CH.ips.data.labels           = pairs.map(([ip]) => ip);
+  CH.ips.data.datasets[0].data = pairs.map(([, cnt]) => cnt);
+  CH.ips.update('none');
+}
+
+function renderModelsChart(data) {
+  const names = Object.keys(data);
+  CH.models.data.labels           = names;
+  CH.models.data.datasets[0].data = names.map(n => data[n].detections ?? 0);
+  CH.models.update('none');
+}
+
+async function changeInterval(btn, iv) {
+  document.querySelectorAll('.interval-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeInterval = iv;
+  try {
+    const d = await get(`/api/dashboard/timeline?interval=${iv}`);
+    renderLine(d);
+  } catch(e) { toast('Timeline error', 'danger'); }
+}
+
+async function updateDashboard() {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const [stats, attacks, tl, ips, mdls, corrStats] = await Promise.all([
+        get('/api/dashboard/stats'),
+        get('/api/dashboard/attacks-by-type'),
+        get(`/api/dashboard/timeline?interval=${activeInterval}`),
+        get('/api/dashboard/top-ips'),
+        get('/api/dashboard/models-stats'),
+        get('/api/dashboard/feedback/stats'),
+      ]);
+      renderKpis(stats);
+      renderPie(attacks);
+      renderLine(tl);
+      renderIpsChart(ips);
+      renderModelsChart(mdls);
+
+      const ts = stats.latest_timestamp ? fmtTs(stats.latest_timestamp) : new Date().toLocaleTimeString();
+      const tsel = document.getElementById('ts-display');
+      if (tsel) tsel.textContent = ts;
+
+      const cb = document.getElementById('corrections-badge');
+      if (cb) cb.textContent = corrStats.validated ?? 0;
+    } catch(e) {
+      console.error('Overview refresh error:', e);
+    }
+  })();
+  try { await refreshPromise; } finally { refreshPromise = null; }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  initCharts();
+  await updateDashboard();
+  startAutoRefresh();
+});
+</script>
+{% endblock %}

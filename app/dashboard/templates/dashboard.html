@@ -738,25 +738,25 @@ Detection Score Comparison
           <div class="col-6 col-md-3">
             <div class="card-panel text-center py-3">
               <div style="font-size:24px;font-weight:700;color:#16a34a" id="corr-tp">0</div>
-              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Vrais Positifs</div>
+              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">True Positives</div>
             </div>
           </div>
           <div class="col-6 col-md-3">
             <div class="card-panel text-center py-3">
               <div style="font-size:24px;font-weight:700;color:#dc2626" id="corr-fp">0</div>
-              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Faux Positifs</div>
+              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">False Positives</div>
             </div>
           </div>
           <div class="col-6 col-md-3">
             <div class="card-panel text-center py-3">
               <div style="font-size:24px;font-weight:700;color:#1d4ed8" id="corr-tn">0</div>
-              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Vrais Negatifs</div>
+              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">True Negatives</div>
             </div>
           </div>
           <div class="col-6 col-md-3">
             <div class="card-panel text-center py-3">
               <div style="font-size:24px;font-weight:700;color:#ea580c" id="corr-fn">0</div>
-              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">Faux Negatifs</div>
+              <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px">False Negatives</div>
             </div>
           </div>
         </div>
@@ -769,7 +769,7 @@ Detection Score Comparison
 Corrections Admin
             </span>
             <div class="btn-group ms-2" id="corr-filter-btns">
-              <button class="btn btn-sm btn-outline-secondary active" onclick="filterCorrections(null, this)">Tout</button>
+              <button class="btn btn-sm btn-outline-secondary active" onclick="filterCorrections(null, this)">All</button>
               <button class="btn btn-sm btn-outline-success"          onclick="filterCorrections('TP', this)">TP</button>
               <button class="btn btn-sm btn-outline-danger"           onclick="filterCorrections('FP', this)">FP</button>
               <button class="btn btn-sm btn-outline-primary"          onclick="filterCorrections('TN', this)">TN</button>
@@ -786,12 +786,12 @@ Corrections Admin
                   <tr>
                     <th style="min-width:150px">Timestamp</th>
                     <th style="min-width:110px">IP</th>
-                    <th style="min-width:90px">Statut original</th>
-                    <th style="min-width:90px">Validation admin</th>
-                    <th style="min-width:110px">Modele</th>
-                    <th style="min-width:90px">Type attaque</th>
+                    <th style="min-width:90px">Original status</th>
+                    <th style="min-width:90px">Admin validation</th>
+                    <th style="min-width:110px">Model</th>
+                    <th style="min-width:90px">Attack type</th>
                     <th style="min-width:200px">Payload</th>
-                    <th style="min-width:140px">Date validation</th>
+                    <th style="min-width:140px">Validation date</th>
                     <th style="min-width:90px">Actions</th>
                   </tr>
                 </thead>
@@ -840,7 +840,7 @@ Corrections Admin
     <div class="modal-content">
       <div class="modal-header" style="padding:14px 18px">
         <h5 class="modal-title mb-0" style="font-size:15px;font-weight:700">
-          <i class="bi bi-flag me-2 text-warning"></i>Corriger cette decision
+          <i class="bi bi-flag me-2 text-warning"></i>Correct this decision
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -1006,7 +1006,7 @@ async function del(url) {
 
 // CHART INIT (called once at DOMContentLoaded)
 function initCharts() {
-  // Doughnut ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â attacks by type
+  // Doughnut chart attacks by type
   CH.pie = new Chart(document.getElementById('ch-pie'), {
     type: 'doughnut',
     data: { labels:[], datasets:[{data:[], backgroundColor:C.cats,
@@ -1021,7 +1021,7 @@ function initCharts() {
     }
   });
 
-  // Line ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â event timeline
+  // Line chart event timeline
   CH.line = new Chart(document.getElementById('ch-line'), {
     type: 'line',
     data: {
@@ -1043,7 +1043,7 @@ function initCharts() {
     }
   });
 
-  // Horizontal bar ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â top IPs
+  // Horizontal bar chart top IPs
   CH.ips = new Chart(document.getElementById('ch-ips'), {
     type: 'bar',
     data: { labels:[], datasets:[{
@@ -1062,7 +1062,7 @@ function initCharts() {
     }
   });
 
-  // Vertical bar ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â models detections (Overview)
+  // Vertical bar chart models detections (Overview)
   CH.models = new Chart(document.getElementById('ch-models'), {
     type: 'bar',
     data: { labels:[], datasets:[{
@@ -1185,6 +1185,9 @@ function renderTable(entries, options = {}) {
   if (!DT) return;
   const preservePage = options.preservePage !== false;
   const currentPage = preservePage ? DT.page() : 0;
+  const keepScroll = document.getElementById('section-logs')?.classList.contains('active');
+  const scrollX = keepScroll ? window.scrollX : 0;
+  const scrollY = keepScroll ? window.scrollY : 0;
 
   // Keep current paging during auto-refresh to avoid jumping back to page 1.
   DT.clear().rows.add(entries).draw(false);
@@ -1199,6 +1202,10 @@ function renderTable(entries, options = {}) {
   } else {
     DT.page(0).draw('page');
   }
+
+  if (keepScroll) {
+    requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
+  }
 }
 
 const ML_META = {
@@ -1207,6 +1214,13 @@ const ML_META = {
   Master_Model : { icon:'bi-diagram-3-fill',            color:'#6f42c1', bg:'#f5f3ff', label:'Master Model',  type:'Ensemble Voting'             },
   LOF          : { icon:'bi-search',                    color:'#0dcaf0', bg:'#ecfeff', label:'LOF Anomaly',   type:'Unsupervised - LOF'          },
 };
+
+function splitModelNames(model) {
+  return String(model || '')
+    .split(/[,;+]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
 
 function renderMLCards(data) {
   const sig = JSON.stringify(data || {});
@@ -1317,21 +1331,12 @@ function openLogModal(row) {
     : '';
 
   let detectionText = '';
+  const detectionVerb = row.status === 'ALERT' ? 'Alerted by' : 'Detected by';
+  const rowModels = splitModelNames(row.model);
   if (row.source === 'rule') {
-    detectionText = 'Detected by: Rule engine';
-  } else if (row.source === 'anomaly' || row.model === 'LOF') {
-    detectionText = 'Detected by: Machine learning engine (Unsupervised model)';
-  } else if (row.source === 'ml') {
-    if (row.model === 'Master_Model') {
-      detectionText = 'Detected by: Machine learning engine (General model)';
-    } else if (row.model === 'SQLi_Expert' || row.model === 'XSS_Expert') {
-      const t = row.attack_type || (row.model.includes('SQLi') ? 'SQLi' : 'XSS');
-      detectionText = `Detected by: Machine learning engine (Expert model | ${t})`;
-    } else if (row.model) {
-      detectionText = `Detected by: Machine learning engine (${row.model})`;
-    } else {
-      detectionText = 'Detected by: Machine learning engine';
-    }
+    detectionText = `${detectionVerb}: Rule engine`;
+  } else if (row.source === 'anomaly' || row.source === 'ml' || (rowModels.length >= 1 && rowModels[0] === 'LOF')) {
+    detectionText = `${detectionVerb}: Machine learning engine`;
   } else {
     detectionText = row.reason || '-';
   }
@@ -1527,7 +1532,7 @@ function applyClientLogFilters(entries = []) {
   }
   if (activeModel) {
     const model = String(activeModel).toLowerCase();
-    out = out.filter(e => String(e.model || '').toLowerCase() === model);
+    out = out.filter(e => splitModelNames(e.model).some(m => m.toLowerCase() === model));
   }
   if (cat) {
     out = out.filter(e => String(e.category || '').toLowerCase() === cat);
@@ -1577,7 +1582,7 @@ async function updateDashboard() {
                                       : new Date().toLocaleTimeString();
     document.getElementById('ts-display').textContent = ts;
 
-    // Update corrections badge (lightweight ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â no table re-render unless section active)
+    // Update corrections badge (lightweight - no table re-render unless section active)
     fetch('/api/dashboard/feedback/stats')
       .then(r => r.json())
       .then(s => {
@@ -1910,32 +1915,32 @@ function renderFeedbackModal(status) {
 
   const primary = isBlocked
     ? [
-        { val:'TP', label:'Vrai Positif', icon:'bi-check-circle-fill', cls:'success',
-          desc:'Sera ajoutÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e au dataset comme exemple ATTAQUE' },
-        { val:'FP', label:'Faux Positif', icon:'bi-x-circle-fill',     cls:'danger',
-          desc:'Sera ajoutÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e au dataset comme exemple NORMAL' },
+        { val:'TP', label:'True Positive', icon:'bi-check-circle-fill', cls:'success',
+          desc:'Will be added to the dataset as ATTACK example' },
+        { val:'FP', label:'False Positive', icon:'bi-x-circle-fill',     cls:'danger',
+          desc:'Will be added to the dataset as NORMAL example' },
       ]
     : [
-        { val:'TN', label:'Vrai NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gatif', icon:'bi-check-circle',              cls:'primary',
-          desc:'Sera ajoutÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e au dataset comme exemple NORMAL' },
-        { val:'FN', label:'Faux NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gatif', icon:'bi-exclamation-circle-fill',   cls:'warning',
-          desc:'Sera ajoutÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e au dataset comme exemple ATTAQUE' },
+        { val:'TN', label:'True Negative', icon:'bi-check-circle',              cls:'primary',
+          desc:'Will be added to the dataset as NORMAL example' },
+        { val:'FN', label:'False Negative', icon:'bi-exclamation-circle-fill',   cls:'warning',
+          desc:'Will be added to the dataset as ATTACK example' },
       ];
 
   const secondary = isBlocked
     ? [
-        { val:'TN', label:'VN (Vrai NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gatif)', icon:'bi-check-circle' },
-        { val:'FN', label:'FN (Faux NÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©gatif)', icon:'bi-exclamation-circle' },
+        { val:'TN', label:'TN (True Negative)', icon:'bi-check-circle' },
+        { val:'FN', label:'FN (False Negative)', icon:'bi-exclamation-circle' },
       ]
     : [
-        { val:'TP', label:'VP (Vrai Positif)', icon:'bi-check-circle-fill' },
-        { val:'FP', label:'FP (Faux Positif)', icon:'bi-x-circle-fill' },
+        { val:'TP', label:'TP (True Positive)', icon:'bi-check-circle-fill' },
+        { val:'FP', label:'FP (False Positive)', icon:'bi-x-circle-fill' },
       ];
 
   const statusLabel = { BLOCKED:'BLOCKED', ALLOWED:'ALLOWED', ALERT:'ALERT' }[status] || status;
   const legend = isBlocked
-    ? `DÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©cision WAF&nbsp;: <span class="badge bg-danger">${statusLabel}</span> ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â validez si l'attaque est rÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©elle (VP) ou corrigez si erreur (FP)`
-    : `DÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©cision WAF&nbsp;: <span class="badge bg-${status==='ALERT'?'warning':'success'}">${statusLabel}</span> ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â validez si requÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªte normale (VN) ou signalez si attaque non dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tectÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e (FN)`;
+    ? `WAF decision&nbsp;: <span class="badge bg-danger">${statusLabel}</span> -> confirm if the attack is real (TP) or correct as error (FP)`
+    : `WAF decision&nbsp;: <span class="badge bg-${status==='ALERT'?'warning':'success'}">${statusLabel}</span> -> confirm if request is normal (TN) or report missed attack (FN)`;
 
   const primaryHtml = primary.map(b => `
     <div class="col-6">
@@ -1958,18 +1963,18 @@ function renderFeedbackModal(status) {
   document.getElementById('feedback-modal-body').innerHTML = `
     <p style="font-size:13px;margin-bottom:14px">${legend}</p>
     <div class="row g-2 mb-3">${primaryHtml}</div>
-    <div style="font-size:11px;color:var(--txt-2);margin-bottom:8px">Autres options :</div>
+    <div style="font-size:11px;color:var(--txt-2);margin-bottom:8px">Other options:</div>
     <div class="row g-2 mb-3">${secondaryHtml}</div>
     <div style="font-size:11px;color:var(--txt-2);line-height:1.8;border-top:1px solid var(--border);padding-top:10px">
-      <strong>VP/TP</strong> = attaque correctement bloquÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e &nbsp;
-      <strong>FP</strong> = requÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªte normale bloquÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  tort<br>
-      <strong>VN/TN</strong> = requÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªte normale autorisÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e &nbsp;
-      <strong>FN</strong> = attaque non dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tectÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e
+      <strong>TP</strong> = attack correctly blocked &nbsp;
+      <strong>FP</strong> = normal request blocked by mistake<br>
+      <strong>TN</strong> = normal request correctly allowed &nbsp;
+      <strong>FN</strong> = attack not detected
     </div>`;
 }
 
 async function sendFeedback(validation) {
-  if (!_modalRow) { toast('Aucun ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©vÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©nement sÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©lectionnÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©', 'warning'); return; }
+  if (!_modalRow) { toast('No event selected', 'warning'); return; }
 
   const payload = {
     request_str:     _modalRow.payload || _modalRow.path || '',
@@ -1988,10 +1993,10 @@ async function sendFeedback(validation) {
     const resp = await post('/api/dashboard/feedback/direct', payload);
     console.log('Feedback response:', resp);
     bootstrap.Modal.getInstance(document.getElementById('feedback-modal'))?.hide();
-    toast('<i class="bi bi-check-circle me-1"></i>Feedback enregistrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â inclus dans le prochain rÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©entraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â®nement', 'success', true);
+    toast('<i class="bi bi-check-circle me-1"></i>Feedback saved -> included in next retraining', 'success', true);
     await loadCorrections();
   } catch(e) {
-    toast('Erreur feedback : ' + e.message, 'danger');
+    toast('Feedback error: ' + e.message, 'danger');
   }
 }
 
@@ -2085,7 +2090,7 @@ function filterCorrections(type, btn) {
 
 function exportCorrectionsCsv() {
   const data = _corrFilter ? _corrData.filter(e => e.admin_validation === _corrFilter) : _corrData;
-  if (!data.length) { toast('Aucune donnÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â  exporter', 'warning'); return; }
+  if (!data.length) { toast('No data to export', 'warning'); return; }
   const cols = ['timestamp','client_ip','prediction','admin_validation','model','attack_type','request','validation_date','score','zone'];
   const header = cols.join(',');
   const rows = data.map(e => cols.map(c => {
@@ -2100,7 +2105,7 @@ function exportCorrectionsCsv() {
   });
   a.click();
   URL.revokeObjectURL(url);
-  toast(`ExportÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© ${data.length} correction(s)`, 'success');
+  toast(`Exported ${data.length} correction(s)`, 'success');
 }
 
 // NAVIGATION
@@ -2126,7 +2131,7 @@ function showSection(name) {
 
   document.getElementById('hdr-title').textContent = TITLES[name] || name;
 
-  // Chart.js ne se redimensionne pas quand il est dans une section cachÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©e
+  // Chart.js does not resize well when section is hidden
   if (name === 'ml-models' && CH.mlDetail)
     requestAnimationFrame(() => CH.mlDetail.resize());
   if (name === 'overview')

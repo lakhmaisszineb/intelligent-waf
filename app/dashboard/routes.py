@@ -17,11 +17,12 @@ Import and mounting in app/main.py:
 from __future__ import annotations
 
 import ipaddress
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.routing import APIRoute
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator
@@ -29,6 +30,7 @@ from pydantic import BaseModel, field_validator
 from app.dashboard.log_parser import (
     LogFilter,
     get_entries_as_dicts,
+    get_ip_stats,
     get_stats,
     get_timeline,
     iter_entries,
@@ -202,6 +204,12 @@ def _build_attacks_by_type(raw_counts: dict[str, int]) -> dict[str, int]:
     return dict(sorted(merged.items(), key=lambda x: x[1], reverse=True))
 
 
+def _split_model_names(model: str) -> list[str]:
+    """Return one or more model names from a log MODEL field."""
+    normalized = (model or "").replace("+", ",").replace(";", ",")
+    return [part.strip() for part in normalized.split(",") if part.strip()]
+
+
 def _build_models_stats() -> dict[str, dict]:
     """
     Compute per-model detection statistics by scanning log entries once.
@@ -220,16 +228,16 @@ def _build_models_stats() -> dict[str, dict]:
         if not entry.model:
             continue
 
-        name = entry.model
-        if name not in accum:
-            accum[name] = {"detections": 0, "total_score": 0.0, "alerts": 0}
+        for name in _split_model_names(entry.model):
+            if name not in accum:
+                accum[name] = {"detections": 0, "total_score": 0.0, "alerts": 0}
 
-        if entry.status == "BLOCKED":
-            accum[name]["detections"] += 1
-            accum[name]["total_score"] += entry.score
-        elif entry.status == "ALERT":
-            accum[name]["alerts"] += 1
-            accum[name]["total_score"] += entry.score
+            if entry.status == "BLOCKED":
+                accum[name]["detections"] += 1
+                accum[name]["total_score"] += entry.score
+            elif entry.status == "ALERT":
+                accum[name]["alerts"] += 1
+                accum[name]["total_score"] += entry.score
 
     result: dict[str, dict] = {}
     for name, data in accum.items():
@@ -250,10 +258,35 @@ def _build_models_stats() -> dict[str, dict]:
 # HTML page
 # ---------------------------------------------------------------------------
 
-@html_router.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page(request: Request):
-    """Serve the WAF monitoring dashboard."""
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+@html_router.get("/dashboard")
+async def dashboard_redirect():
+    """Redirect legacy /dashboard URL to the Overview page."""
+    return RedirectResponse("/dashboard/overview", status_code=301)
+
+
+@html_router.get("/dashboard/overview", response_class=HTMLResponse)
+async def dashboard_overview(request: Request):
+    return templates.TemplateResponse("overview.html", {"request": request, "active_page": "overview"})
+
+
+@html_router.get("/dashboard/event-logs", response_class=HTMLResponse)
+async def dashboard_event_logs(request: Request):
+    return templates.TemplateResponse("event_logs.html", {"request": request, "active_page": "event-logs"})
+
+
+@html_router.get("/dashboard/ip-manager", response_class=HTMLResponse)
+async def dashboard_ip_manager(request: Request):
+    return templates.TemplateResponse("ip_manager.html", {"request": request, "active_page": "ip-manager"})
+
+
+@html_router.get("/dashboard/ml-models", response_class=HTMLResponse)
+async def dashboard_ml_models(request: Request):
+    return templates.TemplateResponse("ml_models.html", {"request": request, "active_page": "ml-models"})
+
+
+@html_router.get("/dashboard/corrections", response_class=HTMLResponse)
+async def dashboard_corrections(request: Request):
+    return templates.TemplateResponse("corrections.html", {"request": request, "active_page": "corrections"})
 
 
 # ---------------------------------------------------------------------------
@@ -280,8 +313,8 @@ async def dashboard_stats():
         "blocked":                  raw["blocked"],
         "alerts":                   raw["alerts"],
         "allowed":                  raw["allowed"],
-        "blocked_by_rules":         by_source.get("rule", 0),
-        "blocked_by_ml":            by_source.get("ml", 0),
+        "blocked_by_rules":         raw.get("blocked_by_rule", 0),
+        "blocked_by_ml":            raw.get("blocked_by_ml", 0),
         "false_positives_estimate": by_zone.get("grey_zone_normal", 0),
         "latest_timestamp":         raw["latest_timestamp"],
     }
@@ -476,6 +509,113 @@ async def remove_from_ip_list(body: IPListRemoveRequest):
 
 
 # ---------------------------------------------------------------------------
+# GET /api/dashboard/reputation-blocked
+# ---------------------------------------------------------------------------
+
+@api_router.get("/reputation-blocked")
+async def reputation_blocked():
+    """
+    IPs currently under a temporary reputation ban (not permanently blacklisted).
+
+    Each entry includes:
+      ip, score, offenses, blocked_until, time_remaining_seconds,
+      total_requests, total_attacks, total_alerts (all from the WAF log).
+
+    Sorted by time_remaining_seconds ascending (soonest-to-expire first).
+    """
+    engine = get_reputation_engine()
+    now = datetime.now()
+    ip_log_stats = get_ip_stats()
+
+    items = []
+    for ip, until in engine.ip_blocked_until.items():
+        if until <= now:
+            continue
+        if ip in engine.blacklist or ip in engine.whitelist:
+            continue
+        remaining = int((until - now).total_seconds())
+        stats = ip_log_stats.get(ip, {})
+        items.append({
+            "ip":                   ip,
+            "score":                engine.get_score(ip),
+            "offenses":             engine.get_offenses(ip),
+            "blocked_until":        until.strftime('%Y-%m-%d %H:%M:%S'),
+            "time_remaining_seconds": remaining,
+            "total_requests":       stats.get("requests", 0),
+            "total_attacks":        stats.get("attacks", 0),
+            "total_alerts":         stats.get("alerts", 0),
+        })
+
+    items.sort(key=lambda x: x["time_remaining_seconds"])
+    return {"items": items, "total": len(items)}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/dashboard/unblock
+# ---------------------------------------------------------------------------
+
+@api_router.post("/unblock", status_code=status.HTTP_200_OK)
+async def unblock_ip_route(body: IPRequest):
+    """
+    Lift the temporary reputation ban on an IP.
+
+    Removes the blocked_until entry and reduces the IP score by 50.
+    The IP is NOT added to the whitelist — further offenses will re-trigger bans.
+    """
+    engine = get_reputation_engine()
+    engine.unblock_ip(body.ip)
+    return {"status": "ok", "ip": body.ip, "action": "unblocked"}
+
+
+# ---------------------------------------------------------------------------
+# GET /api/dashboard/ip-scores
+# ---------------------------------------------------------------------------
+
+@api_router.get("/ip-scores")
+async def ip_scores_all():
+    """
+    All IPs tracked by the reputation engine, sorted by score descending.
+
+    Merges reputation state (score, offenses, ban) with per-IP log counters
+    (total requests, blocked attacks, alerts).  Includes IPs that appear in
+    the whitelist or blacklist even if they carry no score yet.
+    """
+    engine = get_reputation_engine()
+    now = datetime.now()
+    ip_log_stats = get_ip_stats()
+
+    all_ips = (
+        set(engine.ip_scores.keys())
+        | set(engine.ip_offenses.keys())
+        | set(engine.ip_blocked_until.keys())
+        | engine.whitelist
+        | engine.blacklist
+    )
+
+    items = []
+    for ip in all_ips:
+        until = engine.ip_blocked_until.get(ip)
+        is_temp_blocked = until is not None and until > now
+        stats = ip_log_stats.get(ip, {})
+        items.append({
+            "ip":                     ip,
+            "score":                  engine.get_score(ip),
+            "offenses":               engine.get_offenses(ip),
+            "is_whitelisted":         ip in engine.whitelist,
+            "is_blacklisted":         ip in engine.blacklist,
+            "is_temp_blocked":        is_temp_blocked,
+            "blocked_until":          until.strftime('%Y-%m-%d %H:%M:%S') if is_temp_blocked else None,
+            "time_remaining_seconds": int((until - now).total_seconds()) if is_temp_blocked else None,
+            "total_requests":         stats.get("requests", 0),
+            "total_attacks":          stats.get("attacks", 0),
+            "total_alerts":           stats.get("alerts", 0),
+        })
+
+    items.sort(key=lambda x: x["score"], reverse=True)
+    return {"items": items, "total": len(items)}
+
+
+# ---------------------------------------------------------------------------
 # GET /api/dashboard/ip-lists
 # ---------------------------------------------------------------------------
 
@@ -523,7 +663,7 @@ async def ip_lists(list_type: str = "all"):
             "is_blocked": engine.is_blocked(ip),
             "score": engine.get_score(ip),
             "offenses": engine.get_offenses(ip),
-            "blocked_until": blocked_until.isoformat() if blocked_until else None,
+            "blocked_until": blocked_until.strftime('%Y-%m-%d %H:%M:%S') if blocked_until else None,
         })
 
     return {
@@ -573,7 +713,7 @@ async def ip_status(ip: str):
         "is_blacklisted": ip in engine.blacklist,
         "score":          engine.get_score(ip),
         "offenses":       engine.get_offenses(ip),
-        "blocked_until":  blocked_until.isoformat() if blocked_until else None,
+        "blocked_until":  blocked_until.strftime('%Y-%m-%d %H:%M:%S') if blocked_until else None,
     }
 
 
